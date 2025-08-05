@@ -356,6 +356,7 @@ export class ApiService {
         console.log(`Successfully upserted variant with codename: ${languageCodename}`);
       } catch (error) {
         console.log(`Failed to upsert with codename '${languageCodename}', trying with language ID...`);
+        console.log('Original error:', error);
         
         // If codename fails, try to find the language ID and use that
         try {
@@ -364,6 +365,8 @@ export class ApiService {
           
           if (language) {
             console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
+            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}`);
+            
             await this.managementApi.put(
               `/items/${itemId}/variants/${language.id}`,
               variantData
@@ -375,6 +378,7 @@ export class ApiService {
           }
         } catch (languageError) {
           console.error('Error finding language ID:', languageError);
+          console.error('Language error details:', languageError);
           throw error; // Re-throw the original error
         }
       }
