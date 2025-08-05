@@ -1,16 +1,13 @@
 import axios, { AxiosInstance } from 'axios';
-import { 
-  User, 
-  ContentItem, 
-  ContentType, 
-  AssignmentRequest, 
-  SubscriptionApiResponse, 
-  ManagementApiResponse 
+import {
+  User,
+  ContentItem,
+  ContentType,
+  AssignmentRequest,
+  SubscriptionApiResponse,
+  ManagementApiResponse
 } from '../types';
 
-/**
- * API service for Kontent.ai Subscription API and Management API
- */
 export class ApiService {
   private subscriptionApi: AxiosInstance;
   private managementApi: AxiosInstance;
@@ -21,7 +18,6 @@ export class ApiService {
     environmentId: string,
     subscriptionId: string
   ) {
-    // Initialize Subscription API client
     this.subscriptionApi = axios.create({
       baseURL: `https://manage.kontent.ai/v2/subscriptions/${subscriptionId}`,
       headers: {
@@ -30,7 +26,6 @@ export class ApiService {
       },
     });
 
-    // Initialize Management API client
     this.managementApi = axios.create({
       baseURL: `https://manage.kontent.ai/v2/projects/${environmentId}`,
       headers: {
@@ -41,12 +36,16 @@ export class ApiService {
   }
 
   /**
-   * Get all users from the subscription
+   * Get users from the subscription
    */
   async getUsers(): Promise<User[]> {
     try {
       const response = await this.subscriptionApi.get<SubscriptionApiResponse<User[]>>('/users');
-      return response.data.data.map((user: any) => ({
+      
+      // Handle different response structures
+      const users = response.data.data || response.data || [];
+      
+      return users.map((user: any) => ({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
@@ -65,7 +64,16 @@ export class ApiService {
   async getContentItems(): Promise<ContentItem[]> {
     try {
       const response = await this.managementApi.get<ManagementApiResponse<ContentItem[]>>('/items');
-      return response.data.data.map((item: any) => ({
+      
+      // Handle different response structures
+      const items = response.data.data || response.data || [];
+      
+      if (!Array.isArray(items)) {
+        console.error('Unexpected response format:', response.data);
+        throw new Error('Invalid response format from content items API');
+      }
+      
+      return items.map((item: any) => ({
         id: item.id,
         name: item.name,
         codename: item.codename,
@@ -86,7 +94,16 @@ export class ApiService {
   async getContentTypes(): Promise<ContentType[]> {
     try {
       const response = await this.managementApi.get<ManagementApiResponse<ContentType[]>>('/types');
-      return response.data.data.map((type: any) => ({
+      
+      // Handle different response structures
+      const types = response.data.data || response.data || [];
+      
+      if (!Array.isArray(types)) {
+        console.error('Unexpected response format:', response.data);
+        throw new Error('Invalid response format from content types API');
+      }
+      
+      return types.map((type: any) => ({
         codename: type.codename,
         name: type.name,
       }));
@@ -174,14 +191,16 @@ export class ApiService {
           assignment.languageCodename,
           assignment.contributors
         );
+        
         results.push({
-          contentItemId: assignment.contentItemId,
           success: true,
+          itemId: assignment.contentItemId,
+          message: 'Contributors assigned successfully',
         });
       } catch (error) {
         results.push({
-          contentItemId: assignment.contentItemId,
           success: false,
+          itemId: assignment.contentItemId,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }

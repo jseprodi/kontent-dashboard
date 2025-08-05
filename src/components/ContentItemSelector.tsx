@@ -19,7 +19,7 @@ export function ContentItemSelector({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState('all');
 
   useEffect(() => {
     loadData();
@@ -28,15 +28,30 @@ export function ContentItemSelector({
   const loadData = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('Loading content items and types...');
+      
       const [items, types] = await Promise.all([
-        apiService.getContentItems(),
-        apiService.getContentTypes()
+        apiService.getContentItems().catch(err => {
+          console.error('Error loading content items:', err);
+          throw new Error(`Failed to load content items: ${err.message}`);
+        }),
+        apiService.getContentTypes().catch(err => {
+          console.error('Error loading content types:', err);
+          throw new Error(`Failed to load content types: ${err.message}`);
+        })
       ]);
+      
+      console.log('Content items loaded:', items);
+      console.log('Content types loaded:', types);
+      
       setContentItems(items);
       setContentTypes(types);
     } catch (err) {
-      setError('Failed to load content items');
-      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      console.error('Error in loadData:', err);
     } finally {
       setLoading(false);
     }
@@ -122,45 +137,59 @@ export function ContentItemSelector({
             ))}
           </select>
         </div>
+      </div>
 
-        <div className="bulk-actions">
-          <button onClick={handleSelectAll} className="select-all-btn">
-            Select All
-          </button>
-          <button onClick={handleDeselectAll} className="deselect-all-btn">
-            Deselect All
-          </button>
-        </div>
+      <div className="bulk-actions">
+        <button
+          onClick={handleSelectAll}
+          className="select-all-btn"
+          disabled={filteredItems.length === 0}
+        >
+          Select All ({filteredItems.length})
+        </button>
+        <button
+          onClick={handleDeselectAll}
+          className="select-all-btn"
+          disabled={selectedItems.length === 0}
+        >
+          Deselect All
+        </button>
       </div>
 
       <div className="items-list">
         {filteredItems.length === 0 ? (
           <div className="no-items">
-            <p>No content items found matching your criteria.</p>
+            <p>No content items found.</p>
+            {searchTerm && <p>Try adjusting your search terms.</p>}
           </div>
         ) : (
-          filteredItems.map(item => {
-            const isSelected = selectedItems.some(selected => selected.id === item.id);
-            return (
-              <div
-                key={item.id}
-                className={`item-row ${isSelected ? 'selected' : ''}`}
-                onClick={() => handleItemToggle(item)}
-              >
-                <div className="item-checkbox">
-                  {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                </div>
-                <div className="item-info">
-                  <div className="item-name">{item.name}</div>
-                  <div className="item-details">
-                    <span className="item-codename">{item.codename}</span>
-                    <span className="item-type">{item.type.codename}</span>
-                    <span className="item-language">{item.language.codename}</span>
-                  </div>
+          filteredItems.map(item => (
+            <div
+              key={item.id}
+              className={`item-row ${selectedItems.some(selected => selected.id === item.id) ? 'selected' : ''}`}
+              onClick={() => handleItemToggle(item)}
+            >
+              <div className="item-checkbox">
+                {selectedItems.some(selected => selected.id === item.id) ? (
+                  <CheckSquare size={16} />
+                ) : (
+                  <Square size={16} />
+                )}
+              </div>
+              <div className="item-info">
+                <div className="item-name">{item.name}</div>
+                <div className="item-details">
+                  <span className="item-codename">{item.codename}</span>
+                  <span className="item-type">{item.type.codename}</span>
+                  {item.lastModified && (
+                    <span className="item-modified">
+                      Modified: {new Date(item.lastModified).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               </div>
-            );
-          })
+            </div>
+          ))
         )}
       </div>
     </div>

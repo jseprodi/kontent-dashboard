@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User } from '../types';
 import { ApiService } from '../services/api';
-import { Search, Users, CheckSquare, Square, X } from 'lucide-react';
+import { Search, CheckSquare, Square, X } from 'lucide-react';
 
 interface ContributorSelectorProps {
   apiService: ApiService;
@@ -26,11 +26,19 @@ export function ContributorSelector({
   const loadUsers = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('Loading users...');
+      
       const usersData = await apiService.getUsers();
+      
+      console.log('Users loaded:', usersData);
+      
       setUsers(usersData);
     } catch (err) {
-      setError('Failed to load users');
-      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(`Failed to load users: ${errorMessage}`);
+      console.error('Error loading users:', err);
     } finally {
       setLoading(false);
     }
@@ -109,10 +117,18 @@ export function ContributorSelector({
         </div>
 
         <div className="bulk-actions">
-          <button onClick={handleSelectAll} className="select-all-btn">
-            Select All
+          <button 
+            onClick={handleSelectAll} 
+            className="select-all-btn"
+            disabled={filteredUsers.length === 0}
+          >
+            Select All ({filteredUsers.length})
           </button>
-          <button onClick={handleDeselectAll} className="deselect-all-btn">
+          <button 
+            onClick={handleDeselectAll} 
+            className="deselect-all-btn"
+            disabled={selectedContributors.length === 0}
+          >
             Deselect All
           </button>
         </div>
@@ -125,9 +141,7 @@ export function ContributorSelector({
             <div className="contributor-tags">
               {selectedContributors.map(contributor => (
                 <div key={contributor.id} className="contributor-tag">
-                  <span className="contributor-name">
-                    {contributor.fullName || contributor.email}
-                  </span>
+                  <span>{contributor.fullName || contributor.email}</span>
                   <button
                     onClick={() => handleRemoveContributor(contributor.id)}
                     className="remove-btn"
@@ -143,31 +157,32 @@ export function ContributorSelector({
 
       <div className="users-list">
         {filteredUsers.length === 0 ? (
-          <div className="no-users">
-            <Users size={24} />
-            <p>No users found matching your search.</p>
+          <div className="no-items">
+            <p>No users found.</p>
+            {searchTerm && <p>Try adjusting your search terms.</p>}
           </div>
         ) : (
-          filteredUsers.map(user => {
-            const isSelected = selectedContributors.some(selected => selected.id === user.id);
-            return (
-              <div
-                key={user.id}
-                className={`user-row ${isSelected ? 'selected' : ''}`}
-                onClick={() => handleUserToggle(user)}
-              >
-                <div className="user-checkbox">
-                  {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                </div>
-                <div className="user-info">
-                  <div className="user-name">
-                    {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'No name'}
-                  </div>
-                  <div className="user-email">{user.email}</div>
-                </div>
+          filteredUsers.map(user => (
+            <div
+              key={user.id}
+              className={`user-row ${selectedContributors.some(selected => selected.id === user.id) ? 'selected' : ''}`}
+              onClick={() => handleUserToggle(user)}
+            >
+              <div className="user-checkbox">
+                {selectedContributors.some(selected => selected.id === user.id) ? (
+                  <CheckSquare size={16} />
+                ) : (
+                  <Square size={16} />
+                )}
               </div>
-            );
-          })
+              <div className="user-info">
+                <div className="user-name">
+                  {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email}
+                </div>
+                <div className="user-email">{user.email}</div>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>
