@@ -398,6 +398,63 @@ export class ApiService {
   }
 
   /**
+   * Update just the contributors field for a content item
+   */
+  async updateContributors(
+    itemId: string,
+    languageCodename: string,
+    contributorEmails: string[]
+  ): Promise<void> {
+    try {
+      console.log(`Updating contributors for item ${itemId} with language: ${languageCodename}`);
+      console.log('Contributor emails:', contributorEmails);
+      
+      // Try using the language codename first
+      try {
+        await this.managementApi.put(
+          `/items/${itemId}/variants/${languageCodename}/elements/contributors`,
+          {
+            value: contributorEmails
+          }
+        );
+        console.log(`Successfully updated contributors with codename: ${languageCodename}`);
+      } catch (error) {
+        console.log(`Failed to update with codename '${languageCodename}', trying with language ID...`);
+        console.log('Original error:', error);
+        
+        // If codename fails, try with language ID
+        try {
+          const languages = await this.getLanguages();
+          const language = languages.find(lang => lang.codename === languageCodename);
+          
+          if (language) {
+            console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
+            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/elements/contributors`);
+            
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${language.id}/elements/contributors`,
+              {
+                value: contributorEmails
+              }
+            );
+            console.log(`Successfully updated contributors with language ID: ${language.id}`);
+          } else {
+            console.log(`Language not found for codename: ${languageCodename}`);
+            throw new Error(`Language not found for codename: ${languageCodename}`);
+          }
+        } catch (languageError) {
+          console.error('Error finding language ID:', languageError);
+          console.error('Language error details:', languageError);
+          throw error; // Re-throw the original error
+        }
+      }
+    } catch (error) {
+      console.error('Error updating contributors:', error);
+      throw new Error('Failed to update contributors');
+    }
+  }
+
+  /**
    * Assign contributors to a content item
    */
   async assignContributors(
@@ -470,22 +527,33 @@ export class ApiService {
       
       console.log('Current variant:', currentVariant);
       
-      // Update the contributors field
-      const updatedVariant = {
-        ...currentVariant,
-        elements: {
-          ...currentVariant.elements,
-          contributors: {
-            value: contributorEmails,
+      // Try the simpler approach first - update just the contributors field
+      try {
+        console.log('Trying simple contributors update...');
+        await this.updateContributors(itemId, actualLanguageCodename, contributorEmails);
+        console.log(`Successfully assigned contributors using simple update for item ${itemId}`);
+        return; // Exit early if successful
+      } catch (simpleError) {
+        console.log('Simple update failed, trying full variant upsert...');
+        console.log('Simple error:', simpleError);
+        
+        // If simple update fails, try the full variant upsert
+        const updatedVariant = {
+          ...currentVariant,
+          elements: {
+            ...currentVariant.elements,
+            contributors: {
+              value: contributorEmails,
+            },
           },
-        },
-      };
+        };
 
-      console.log('Updated variant:', updatedVariant);
+        console.log('Updated variant:', updatedVariant);
 
-      // Upsert the updated variant using the actual language codename and language info
-      await this.upsertLanguageVariant(itemId, actualLanguageCodename, updatedVariant, languageInfo);
-      console.log(`Successfully assigned contributors to item ${itemId} with language: ${actualLanguageCodename}`);
+        // Upsert the updated variant using the actual language codename and language info
+        await this.upsertLanguageVariant(itemId, actualLanguageCodename, updatedVariant, languageInfo);
+        console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
+      }
     } catch (error) {
       console.error('Error assigning contributors:', error);
       throw new Error('Failed to assign contributors');
