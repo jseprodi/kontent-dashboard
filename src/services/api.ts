@@ -367,6 +367,8 @@ export class ApiService {
       
       // First, try to get the specific language variant
       let currentVariant;
+      let actualLanguageCodename = languageCodename;
+      
       try {
         currentVariant = await this.getContentItem(itemId, languageCodename);
         console.log(`Found variant for language: ${languageCodename}`);
@@ -379,11 +381,37 @@ export class ApiService {
           console.log('Available variants:', variants);
           
           if (variants.length > 0) {
-            // Use the first available variant
+            // Get the first available variant
             const firstVariant = variants[0];
-            const actualLanguageCodename = firstVariant.language?.codename || firstVariant.codename || 'default';
-            console.log(`Using first available variant with language: ${actualLanguageCodename}`);
+            const languageId = firstVariant.language?.id;
             
+            console.log(`First variant language ID: ${languageId}`);
+            
+            if (languageId) {
+              // Get all languages to find the codename for this ID
+              try {
+                const languages = await this.getLanguages();
+                console.log('Available languages:', languages);
+                
+                const language = languages.find(lang => lang.id === languageId);
+                if (language) {
+                  actualLanguageCodename = language.codename;
+                  console.log(`Found language codename: ${actualLanguageCodename} for ID: ${languageId}`);
+                } else {
+                  console.log(`Language with ID ${languageId} not found in languages list, using ID as codename`);
+                  actualLanguageCodename = languageId;
+                }
+              } catch (languagesError) {
+                console.error('Error getting languages:', languagesError);
+                console.log(`Using language ID ${languageId} as codename`);
+                actualLanguageCodename = languageId;
+              }
+            } else {
+              console.log('No language ID found in variant, using default');
+              actualLanguageCodename = 'default';
+            }
+            
+            console.log(`Using variant with language: ${actualLanguageCodename}`);
             currentVariant = await this.getContentItem(itemId, actualLanguageCodename);
           } else {
             throw new Error('No language variants found for this content item');
@@ -409,9 +437,9 @@ export class ApiService {
 
       console.log('Updated variant:', updatedVariant);
 
-      // Upsert the updated variant
-      await this.upsertLanguageVariant(itemId, languageCodename, updatedVariant);
-      console.log(`Successfully assigned contributors to item ${itemId}`);
+      // Upsert the updated variant using the actual language codename
+      await this.upsertLanguageVariant(itemId, actualLanguageCodename, updatedVariant);
+      console.log(`Successfully assigned contributors to item ${itemId} with language: ${actualLanguageCodename}`);
     } catch (error) {
       console.error('Error assigning contributors:', error);
       throw new Error('Failed to assign contributors');
