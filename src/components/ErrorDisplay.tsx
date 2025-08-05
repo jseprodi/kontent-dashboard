@@ -1,47 +1,65 @@
-/**
- * Error display component with Kontent.ai styling
- */
+import { AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
 
 interface ErrorDisplayProps {
-  /** Error message to display */
   error: string;
-  /** Optional title for the error */
-  title?: string;
-  /** Callback function for retry action */
   onRetry?: () => void;
 }
 
-/**
- * Error display component that matches Kontent.ai design system
- */
-export function ErrorDisplay({ error, title = 'Error', onRetry }: ErrorDisplayProps) {
-  const isIframeError = error.includes('must be hosted within the Kontent.ai CMS interface');
-  
+export function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
+  const isIframeError = error.includes('IFrame') || error.includes('iframe');
+  const isDeploymentError = error.includes('401') || error.includes('unauthorized');
+
   return (
-    <div className="card">
-      <div className="alert alert-error">
-        <h4 className="mb-1">{title}</h4>
-        <p className="mb-2">{error}</p>
-        
-        {isIframeError && (
-          <div className="mt-3">
-            <h5>How to use this custom app:</h5>
-            <ol style={{ marginLeft: '20px', marginTop: '8px' }}>
-              <li>Open your Kontent.ai project</li>
-              <li>Navigate to Environment settings → Custom apps</li>
-              <li>Add this app with the correct URL</li>
-              <li>Access the app from within the Kontent.ai interface</li>
-            </ol>
-            <p className="mt-2" style={{ fontSize: '14px', color: 'var(--kontent-text-color)' }}>
-              💡 This app cannot run standalone - it requires the Kontent.ai context to function properly.
-            </p>
+    <div className="error-display">
+      <div className="error-icon">
+        <AlertCircle size={48} />
+      </div>
+      
+      <h2>Something went wrong</h2>
+      
+      <div className="error-message">
+        {isIframeError ? (
+          <div>
+            <p><strong>This app must be opened from within Kontent.ai</strong></p>
+            <p>Please navigate to your Kontent.ai project and open this custom app from there.</p>
+            <div className="error-actions">
+              <a 
+                href="https://app.kontent.ai" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="button primary"
+              >
+                <ExternalLink size={16} />
+                Open Kontent.ai
+              </a>
+            </div>
           </div>
-        )}
-        
-        {onRetry && !isIframeError && (
-          <button className="btn btn-secondary" onClick={onRetry}>
-            Try Again
-          </button>
+        ) : isDeploymentError ? (
+          <div>
+            <p><strong>Deployment Configuration Issue</strong></p>
+            <p>The app is not properly configured for iframe embedding. Please check the deployment settings.</p>
+            <div className="error-actions">
+              {onRetry && (
+                <button onClick={onRetry} className="button secondary">
+                  <RefreshCw size={16} />
+                  Retry
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p><strong>Unexpected Error</strong></p>
+            <p>{error}</p>
+            <div className="error-actions">
+              {onRetry && (
+                <button onClick={onRetry} className="button secondary">
+                  <RefreshCw size={16} />
+                  Retry
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

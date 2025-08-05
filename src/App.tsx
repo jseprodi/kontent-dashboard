@@ -23,14 +23,13 @@ function AppContent() {
   }
 
   if (appState.error) {
-    const isIframeError = appState.error.includes('must be hosted within the Kontent.ai CMS interface');
-    const title = isIframeError ? 'App Not Running in Kontent.ai' : 'Failed to Initialize Custom App';
-    const onRetry = isIframeError ? undefined : () => window.location.reload();
+    const onRetry = appState.error.includes('IFrame') || appState.error.includes('iframe') 
+      ? undefined 
+      : () => window.location.reload();
     
     return (
       <ErrorDisplay 
         error={appState.error} 
-        title={title}
         onRetry={onRetry}
       />
     );
