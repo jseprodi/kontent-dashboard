@@ -341,7 +341,8 @@ export class ApiService {
   async upsertLanguageVariant(
     itemId: string, 
     languageCodename: string, 
-    variantData: any
+    variantData: any,
+    languageInfo?: any
   ): Promise<void> {
     try {
       console.log(`Upserting variant for item ${itemId} with language: ${languageCodename}`);
@@ -360,8 +361,16 @@ export class ApiService {
         
         // If codename fails, try to find the language ID and use that
         try {
-          const languages = await this.getLanguages();
-          const language = languages.find(lang => lang.codename === languageCodename);
+          let language;
+          if (languageInfo) {
+            // Use the language info we already have
+            language = languageInfo;
+            console.log(`Using provided language info:`, language);
+          } else {
+            // Fallback to fetching languages if not provided
+            const languages = await this.getLanguages();
+            language = languages.find(lang => lang.codename === languageCodename);
+          }
           
           if (language) {
             console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
@@ -402,6 +411,7 @@ export class ApiService {
       // First, try to get the specific language variant
       let currentVariant;
       let actualLanguageCodename = languageCodename;
+      let languageInfo = null;
       
       try {
         currentVariant = await this.getContentItem(itemId, languageCodename);
@@ -430,6 +440,7 @@ export class ApiService {
                 const language = languages.find(lang => lang.id === languageId);
                 if (language) {
                   actualLanguageCodename = language.codename;
+                  languageInfo = language; // Store the language info
                   console.log(`Found language codename: ${actualLanguageCodename} for ID: ${languageId}`);
                 } else {
                   console.log(`Language with ID ${languageId} not found in languages list, using ID as codename`);
@@ -472,8 +483,8 @@ export class ApiService {
 
       console.log('Updated variant:', updatedVariant);
 
-      // Upsert the updated variant using the actual language codename
-      await this.upsertLanguageVariant(itemId, actualLanguageCodename, updatedVariant);
+      // Upsert the updated variant using the actual language codename and language info
+      await this.upsertLanguageVariant(itemId, actualLanguageCodename, updatedVariant, languageInfo);
       console.log(`Successfully assigned contributors to item ${itemId} with language: ${actualLanguageCodename}`);
     } catch (error) {
       console.error('Error assigning contributors:', error);
