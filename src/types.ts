@@ -57,8 +57,8 @@ export interface ContentItem {
   type: {
     codename: string;
   };
-  lastModified: string;
-  language: {
+  lastModified?: string;
+  language?: {
     codename: string;
   };
   contributors?: string[];

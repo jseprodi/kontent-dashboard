@@ -33,11 +33,20 @@ export function useBulkAssignment({ apiService }: UseBulkAssignmentProps): UseBu
     setAssignmentResults([]);
 
     try {
-      const assignments: AssignmentRequest[] = selectedContentItems.map(item => ({
-        contentItemId: item.id,
-        languageCodename: item.language.codename,
-        contributors: selectedContributors.map(contributor => contributor.email),
-      }));
+      const assignments: AssignmentRequest[] = selectedContentItems.map(item => {
+        // Handle cases where language might not be available
+        const languageCodename = item.language?.codename || 'default';
+        
+        console.log(`Creating assignment for item ${item.id} (${item.name}) with language: ${languageCodename}`);
+        
+        return {
+          contentItemId: item.id,
+          languageCodename: languageCodename,
+          contributors: selectedContributors.map(contributor => contributor.email),
+        };
+      });
+
+      console.log('Bulk assignment requests:', assignments);
 
       const results = await apiService.bulkAssignContributors(assignments);
       setAssignmentResults(results);
