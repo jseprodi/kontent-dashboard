@@ -411,8 +411,9 @@ export class ApiService {
               actualLanguageCodename = 'default';
             }
             
-            console.log(`Using variant with language: ${actualLanguageCodename}`);
-            currentVariant = await this.getContentItem(itemId, actualLanguageCodename);
+            // Use the variant data we already have instead of fetching it again
+            console.log(`Using existing variant data with language: ${actualLanguageCodename}`);
+            currentVariant = firstVariant;
           } else {
             throw new Error('No language variants found for this content item');
           }
