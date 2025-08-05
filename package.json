@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "start": "node server.js",
     "certs": "mkcert localhost",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit"
@@ -41,7 +42,8 @@
     "axios": "^1.6.0",
     "react-hook-form": "^7.48.0",
     "react-select": "^5.8.0",
-    "lucide-react": "^0.294.0"
+    "lucide-react": "^0.294.0",
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.45",

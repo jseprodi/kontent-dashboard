@@ -26,15 +26,13 @@ export default defineConfig({
     open: true,
     https: httpsConfig,
     headers: {
-      'X-Frame-Options': 'ALLOW-FROM https://app.kontent.ai',
-      'Content-Security-Policy': "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai",
+      'Content-Security-Policy': "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai https://manage.kontent.ai",
     },
   },
   preview: {
     port: 3000,
     headers: {
-      'X-Frame-Options': 'ALLOW-FROM https://app.kontent.ai',
-      'Content-Security-Policy': "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai",
+      'Content-Security-Policy': "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai https://manage.kontent.ai",
     },
   },
 })

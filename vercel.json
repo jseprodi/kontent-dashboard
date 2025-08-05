@@ -4,12 +4,8 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Frame-Options",
-          "value": "ALLOW-FROM https://app.kontent.ai"
-        },
-        {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai"
+          "value": "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai https://manage.kontent.ai"
         },
         {
           "key": "Access-Control-Allow-Origin",
