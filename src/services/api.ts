@@ -183,6 +183,8 @@ export class ApiService {
         types = responseData;
       } else if (responseData && Array.isArray(responseData.data)) {
         types = responseData.data;
+      } else if (responseData && responseData.types && Array.isArray(responseData.types)) {
+        types = responseData.types;
       } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
         types = responseData.items;
       } else if (responseData && responseData.elements && Array.isArray(responseData.elements)) {
