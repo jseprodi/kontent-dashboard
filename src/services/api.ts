@@ -538,14 +538,13 @@ export class ApiService {
         console.log('Simple error:', simpleError);
         
         // If simple update fails, try the full variant upsert
+        // Convert elements object to array format that the API expects
+        const elementsArray = Object.values(currentVariant.elements || {});
+        console.log('Elements array:', elementsArray);
+        
         const updatedVariant = {
           ...currentVariant,
-          elements: {
-            ...currentVariant.elements,
-            contributors: {
-              value: contributorEmails,
-            },
-          },
+          elements: elementsArray,
         };
 
         console.log('Updated variant:', updatedVariant);
