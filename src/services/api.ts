@@ -344,10 +344,40 @@ export class ApiService {
     variantData: any
   ): Promise<void> {
     try {
-      await this.managementApi.put(
-        `/items/${itemId}/variants/${languageCodename}`,
-        variantData
-      );
+      console.log(`Upserting variant for item ${itemId} with language: ${languageCodename}`);
+      console.log('Variant data to upsert:', variantData);
+      
+      // Try using the language codename first
+      try {
+        await this.managementApi.put(
+          `/items/${itemId}/variants/${languageCodename}`,
+          variantData
+        );
+        console.log(`Successfully upserted variant with codename: ${languageCodename}`);
+      } catch (error) {
+        console.log(`Failed to upsert with codename '${languageCodename}', trying with language ID...`);
+        
+        // If codename fails, try to find the language ID and use that
+        try {
+          const languages = await this.getLanguages();
+          const language = languages.find(lang => lang.codename === languageCodename);
+          
+          if (language) {
+            console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${language.id}`,
+              variantData
+            );
+            console.log(`Successfully upserted variant with language ID: ${language.id}`);
+          } else {
+            console.log(`Language not found for codename: ${languageCodename}`);
+            throw new Error(`Language not found for codename: ${languageCodename}`);
+          }
+        } catch (languageError) {
+          console.error('Error finding language ID:', languageError);
+          throw error; // Re-throw the original error
+        }
+      }
     } catch (error) {
       console.error('Error upserting language variant:', error);
       throw new Error('Failed to upsert language variant');
