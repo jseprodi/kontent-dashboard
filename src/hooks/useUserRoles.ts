@@ -12,5 +12,5 @@ export function useUserRoles(): UserRole[] {
     return [];
   }
   
-  return context.context.context?.userRoles || [];
+  return context.context.context.userRoles || [];
 }

@@ -11,5 +11,5 @@ export function useEnvironmentId(): string | null {
     return null;
   }
   
-  return context.context.context?.environmentId || null;
+  return context.context.context.environmentId || null;
 }

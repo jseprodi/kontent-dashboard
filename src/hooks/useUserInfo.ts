@@ -17,7 +17,7 @@ export function useUserInfo(): UserInfo | null {
   }
   
   return {
-    userId: context.context.context?.userId || '',
-    userEmail: context.context.context?.userEmail || '',
+    userId: context.context.context.userId || '',
+    userEmail: context.context.context.userEmail || '',
   };
 }
