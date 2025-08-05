@@ -1,53 +1,102 @@
 /**
- * Type definitions for Kontent.ai Custom App SDK integration
+ * Type definitions for the Kontent.ai Custom App
  */
 
-/**
- * User role information from Kontent.ai
- */
-export interface UserRole {
-  /** Role ID */
-  readonly id: string;
-  /** Role codename - applicable only for the Project manager role */
-  readonly codename?: string | null;
+export interface CustomAppContext {
+  config: Record<string, any>;
+  context: {
+    environmentId: string;
+    userId: string;
+    userEmail: string;
+    userRoles: Array<{
+      id: string;
+      codename?: string;
+    }>;
+  };
 }
 
-/**
- * Context data provided by Kontent.ai application
- */
+export interface CustomAppState {
+  isLoading: boolean;
+  error: string | null;
+  context: CustomAppContext | null;
+}
+
+// Legacy types for backward compatibility with existing hooks
 export interface AppContext {
-  /** Environment ID */
   environmentId: string;
-  /** Current user's ID */
   userId: string;
-  /** Current user's email */
   userEmail: string;
-  /** Array of user roles in the environment */
-  userRoles: readonly UserRole[];
+  userRoles: Array<{
+    id: string;
+    codename?: string;
+  }>;
 }
 
-/**
- * Custom app configuration interface
- * 
- * Contains configuration values passed from Kontent.ai when your app is initialized.
- * The structure depends on what you configure in the Kontent.ai interface.
- */
 export interface AppConfig {
   [key: string]: unknown;
 }
 
-/**
- * Custom app state interface
- */
-export interface CustomAppState {
-  /** Whether the app is loading */
-  isLoading: boolean;
-  /** Error state */
-  error: string | null;
-  /** App configuration */
-  config: AppConfig | null;
-  /** Kontent.ai context */
-  context: AppContext | null;
+export interface UserRole {
+  readonly id: string;
+  readonly codename?: string | null;
+}
+
+// Types for the bulk contributor assignment app
+export interface User {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+}
+
+export interface ContentItem {
+  id: string;
+  name: string;
+  codename: string;
+  type: {
+    codename: string;
+  };
+  lastModified: string;
+  language: {
+    codename: string;
+  };
+  contributors?: string[];
+}
+
+export interface ContentType {
+  codename: string;
+  name: string;
+}
+
+export interface AssignmentRequest {
+  contentItemId: string;
+  languageCodename: string;
+  contributors: string[];
+}
+
+export interface AssignmentResult {
+  contentItemId: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BulkAssignmentState {
+  selectedContentItems: ContentItem[];
+  selectedContributors: User[];
+  isAssigning: boolean;
+  assignmentResults: AssignmentResult[];
+}
+
+export interface SubscriptionApiResponse<T> {
+  data: T;
+  pagination?: {
+    continuation_token?: string;
+  };
+}
+
+export interface ManagementApiResponse<T> {
+  data: T;
 }
 
 

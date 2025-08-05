@@ -4,6 +4,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './styles.css';
 
 // Ensure we're running in a browser environment
 if (typeof window === 'undefined') {
