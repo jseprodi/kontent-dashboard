@@ -1,0 +1,17 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "frame-ancestors 'self' https://app.kontent.ai https://*.kontent.ai https://manage.kontent.ai"
+    Access-Control-Allow-Origin = "https://app.kontent.ai"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Allow-Credentials = "true"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200 
