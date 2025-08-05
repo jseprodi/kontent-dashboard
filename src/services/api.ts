@@ -49,15 +49,24 @@ export class ApiService {
       console.log('Response status:', response.status);
       console.log('Response data:', response.data);
       
-      // Handle different response structures
-      const users = response.data.data || response.data || [];
+      // Handle different response structures - Kontent.ai might return the array directly
+      let users: any[] = [];
+      const responseData = response.data as any;
+      
+      if (Array.isArray(responseData)) {
+        users = responseData;
+      } else if (responseData && Array.isArray(responseData.data)) {
+        users = responseData.data;
+      } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
+        users = responseData.items;
+      } else if (responseData && responseData.users && Array.isArray(responseData.users)) {
+        users = responseData.users;
+      } else {
+        console.error('Unexpected response format:', responseData);
+        throw new Error(`Invalid response format from users API. Expected array, got: ${typeof responseData}`);
+      }
       
       console.log('Processed users:', users);
-      
-      if (!Array.isArray(users)) {
-        console.error('Unexpected response format:', response.data);
-        throw new Error(`Invalid response format from users API. Expected array, got: ${typeof users}`);
-      }
       
       const mappedUsers = users.map((user: any) => ({
         id: user.id,
@@ -102,15 +111,24 @@ export class ApiService {
       console.log('Response status:', response.status);
       console.log('Response data:', response.data);
       
-      // Handle different response structures
-      const items = response.data.data || response.data || [];
+      // Handle different response structures - Kontent.ai might return the array directly
+      let items: any[] = [];
+      const responseData = response.data as any;
+      
+      if (Array.isArray(responseData)) {
+        items = responseData;
+      } else if (responseData && Array.isArray(responseData.data)) {
+        items = responseData.data;
+      } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
+        items = responseData.items;
+      } else if (responseData && responseData.elements && Array.isArray(responseData.elements)) {
+        items = responseData.elements;
+      } else {
+        console.error('Unexpected response format:', responseData);
+        throw new Error(`Invalid response format from content items API. Expected array, got: ${typeof responseData}`);
+      }
       
       console.log('Processed items:', items);
-      
-      if (!Array.isArray(items)) {
-        console.error('Unexpected response format:', response.data);
-        throw new Error(`Invalid response format from content items API. Expected array, got: ${typeof items}`);
-      }
       
       const mappedItems = items.map((item: any) => ({
         id: item.id,
@@ -157,15 +175,24 @@ export class ApiService {
       console.log('Response status:', response.status);
       console.log('Response data:', response.data);
       
-      // Handle different response structures
-      const types = response.data.data || response.data || [];
+      // Handle different response structures - Kontent.ai might return the array directly
+      let types: any[] = [];
+      const responseData = response.data as any;
+      
+      if (Array.isArray(responseData)) {
+        types = responseData;
+      } else if (responseData && Array.isArray(responseData.data)) {
+        types = responseData.data;
+      } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
+        types = responseData.items;
+      } else if (responseData && responseData.elements && Array.isArray(responseData.elements)) {
+        types = responseData.elements;
+      } else {
+        console.error('Unexpected response format:', responseData);
+        throw new Error(`Invalid response format from content types API. Expected array, got: ${typeof responseData}`);
+      }
       
       console.log('Processed types:', types);
-      
-      if (!Array.isArray(types)) {
-        console.error('Unexpected response format:', response.data);
-        throw new Error(`Invalid response format from content types API. Expected array, got: ${typeof types}`);
-      }
       
       const mappedTypes = types.map((type: any) => ({
         codename: type.codename,
