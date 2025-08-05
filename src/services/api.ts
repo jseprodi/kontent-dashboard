@@ -223,6 +223,55 @@ export class ApiService {
   }
 
   /**
+   * Get available languages for the project
+   */
+  async getLanguages(): Promise<any[]> {
+    try {
+      console.log('Making request to languages API...');
+      const response = await this.managementApi.get('/languages');
+      
+      console.log('Languages API response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      // Handle different response structures
+      let languages: any[] = [];
+      const responseData = response.data as any;
+      
+      if (Array.isArray(responseData)) {
+        languages = responseData;
+      } else if (responseData && Array.isArray(responseData.data)) {
+        languages = responseData.data;
+      } else if (responseData && responseData.languages && Array.isArray(responseData.languages)) {
+        languages = responseData.languages;
+      } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
+        languages = responseData.items;
+      } else {
+        console.error('Unexpected response format:', responseData);
+        throw new Error(`Invalid response format from languages API. Expected array, got: ${typeof responseData}`);
+      }
+      
+      console.log('Processed languages:', languages);
+      return languages;
+    } catch (error: any) {
+      console.error('Error fetching languages - Full error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to fetch languages: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        throw new Error('Failed to fetch languages: No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        throw new Error(`Failed to fetch languages: ${error.message}`);
+      }
+    }
+  }
+
+  /**
    * Get a specific content item with its language variant
    */
   async getContentItem(itemId: string, languageCodename: string): Promise<any> {
@@ -234,6 +283,55 @@ export class ApiService {
     } catch (error) {
       console.error('Error fetching content item:', error);
       throw new Error('Failed to fetch content item');
+    }
+  }
+
+  /**
+   * Get content item variants to find available languages
+   */
+  async getContentItemVariants(itemId: string): Promise<any[]> {
+    try {
+      console.log(`Getting variants for item ${itemId}...`);
+      const response = await this.managementApi.get(`/items/${itemId}/variants`);
+      
+      console.log('Content item variants response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      // Handle different response structures
+      let variants: any[] = [];
+      const responseData = response.data as any;
+      
+      if (Array.isArray(responseData)) {
+        variants = responseData;
+      } else if (responseData && Array.isArray(responseData.data)) {
+        variants = responseData.data;
+      } else if (responseData && responseData.variants && Array.isArray(responseData.variants)) {
+        variants = responseData.variants;
+      } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
+        variants = responseData.items;
+      } else {
+        console.error('Unexpected response format:', responseData);
+        throw new Error(`Invalid response format from content item variants API. Expected array, got: ${typeof responseData}`);
+      }
+      
+      console.log('Processed variants:', variants);
+      return variants;
+    } catch (error: any) {
+      console.error('Error fetching content item variants - Full error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to fetch content item variants: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        throw new Error('Failed to fetch content item variants: No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        throw new Error(`Failed to fetch content item variants: ${error.message}`);
+      }
     }
   }
 
@@ -265,8 +363,38 @@ export class ApiService {
     contributorEmails: string[]
   ): Promise<void> {
     try {
-      // First, get the current variant
-      const currentVariant = await this.getContentItem(itemId, languageCodename);
+      console.log(`Assigning contributors to item ${itemId} with language: ${languageCodename}`);
+      
+      // First, try to get the specific language variant
+      let currentVariant;
+      try {
+        currentVariant = await this.getContentItem(itemId, languageCodename);
+        console.log(`Found variant for language: ${languageCodename}`);
+      } catch (error) {
+        console.log(`Language variant '${languageCodename}' not found, trying to find available variants...`);
+        
+        // If the specific language doesn't exist, try to get all variants
+        try {
+          const variants = await this.getContentItemVariants(itemId);
+          console.log('Available variants:', variants);
+          
+          if (variants.length > 0) {
+            // Use the first available variant
+            const firstVariant = variants[0];
+            const actualLanguageCodename = firstVariant.language?.codename || firstVariant.codename || 'default';
+            console.log(`Using first available variant with language: ${actualLanguageCodename}`);
+            
+            currentVariant = await this.getContentItem(itemId, actualLanguageCodename);
+          } else {
+            throw new Error('No language variants found for this content item');
+          }
+        } catch (variantsError) {
+          console.error('Error getting variants:', variantsError);
+          throw new Error(`No language variants found for content item ${itemId}`);
+        }
+      }
+      
+      console.log('Current variant:', currentVariant);
       
       // Update the contributors field
       const updatedVariant = {
@@ -279,8 +407,11 @@ export class ApiService {
         },
       };
 
+      console.log('Updated variant:', updatedVariant);
+
       // Upsert the updated variant
       await this.upsertLanguageVariant(itemId, languageCodename, updatedVariant);
+      console.log(`Successfully assigned contributors to item ${itemId}`);
     } catch (error) {
       console.error('Error assigning contributors:', error);
       throw new Error('Failed to assign contributors');
