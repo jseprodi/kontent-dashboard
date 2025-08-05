@@ -40,21 +40,51 @@ export class ApiService {
    */
   async getUsers(): Promise<User[]> {
     try {
+      console.log('Making request to users API...');
+      console.log('Subscription API base URL:', this.subscriptionApi.defaults.baseURL);
+      
       const response = await this.subscriptionApi.get<SubscriptionApiResponse<User[]>>('/users');
+      
+      console.log('Users API response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
       
       // Handle different response structures
       const users = response.data.data || response.data || [];
       
-      return users.map((user: any) => ({
+      console.log('Processed users:', users);
+      
+      if (!Array.isArray(users)) {
+        console.error('Unexpected response format:', response.data);
+        throw new Error(`Invalid response format from users API. Expected array, got: ${typeof users}`);
+      }
+      
+      const mappedUsers = users.map((user: any) => ({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         fullName: user.fullName,
       }));
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw new Error('Failed to fetch users');
+      
+      console.log('Mapped users:', mappedUsers);
+      
+      return mappedUsers;
+    } catch (error: any) {
+      console.error('Error fetching users - Full error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to fetch users: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        throw new Error('Failed to fetch users: No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        throw new Error(`Failed to fetch users: ${error.message}`);
+      }
     }
   }
 
@@ -63,17 +93,26 @@ export class ApiService {
    */
   async getContentItems(): Promise<ContentItem[]> {
     try {
+      console.log('Making request to content items API...');
+      console.log('Management API base URL:', this.managementApi.defaults.baseURL);
+      
       const response = await this.managementApi.get<ManagementApiResponse<ContentItem[]>>('/items');
+      
+      console.log('Content items API response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
       
       // Handle different response structures
       const items = response.data.data || response.data || [];
       
+      console.log('Processed items:', items);
+      
       if (!Array.isArray(items)) {
         console.error('Unexpected response format:', response.data);
-        throw new Error('Invalid response format from content items API');
+        throw new Error(`Invalid response format from content items API. Expected array, got: ${typeof items}`);
       }
       
-      return items.map((item: any) => ({
+      const mappedItems = items.map((item: any) => ({
         id: item.id,
         name: item.name,
         codename: item.codename,
@@ -82,9 +121,25 @@ export class ApiService {
         language: item.language,
         contributors: item.contributors,
       }));
-    } catch (error) {
-      console.error('Error fetching content items:', error);
-      throw new Error('Failed to fetch content items');
+      
+      console.log('Mapped content items:', mappedItems);
+      
+      return mappedItems;
+    } catch (error: any) {
+      console.error('Error fetching content items - Full error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to fetch content items: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        throw new Error('Failed to fetch content items: No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        throw new Error(`Failed to fetch content items: ${error.message}`);
+      }
     }
   }
 
@@ -93,23 +148,48 @@ export class ApiService {
    */
   async getContentTypes(): Promise<ContentType[]> {
     try {
+      console.log('Making request to content types API...');
+      console.log('Management API base URL:', this.managementApi.defaults.baseURL);
+      
       const response = await this.managementApi.get<ManagementApiResponse<ContentType[]>>('/types');
+      
+      console.log('Content types API response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
       
       // Handle different response structures
       const types = response.data.data || response.data || [];
       
+      console.log('Processed types:', types);
+      
       if (!Array.isArray(types)) {
         console.error('Unexpected response format:', response.data);
-        throw new Error('Invalid response format from content types API');
+        throw new Error(`Invalid response format from content types API. Expected array, got: ${typeof types}`);
       }
       
-      return types.map((type: any) => ({
+      const mappedTypes = types.map((type: any) => ({
         codename: type.codename,
         name: type.name,
       }));
-    } catch (error) {
-      console.error('Error fetching content types:', error);
-      throw new Error('Failed to fetch content types');
+      
+      console.log('Mapped content types:', mappedTypes);
+      
+      return mappedTypes;
+    } catch (error: any) {
+      console.error('Error fetching content types - Full error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to fetch content types: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        throw new Error('Failed to fetch content types: No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        throw new Error(`Failed to fetch content types: ${error.message}`);
+      }
     }
   }
 

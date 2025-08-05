@@ -5,6 +5,7 @@ import { ApiService } from '../services/api';
 import { ContentItemSelector } from './ContentItemSelector';
 import { ContributorSelector } from './ContributorSelector';
 import { AssignmentResults } from './AssignmentResults';
+import { ApiTest } from './ApiTest';
 import { Users, FileText, ArrowRight, Settings } from 'lucide-react';
 
 export function BulkAssignmentDashboard() {
@@ -101,10 +102,10 @@ export function BulkAssignmentDashboard() {
                 onChange={(e) => setApiConfig(prev => ({ ...prev, subscriptionApiKey: e.target.value }))}
               />
               <small>
-                Get this from Kontent.ai → Your Profile → Subscriptions → Subscription API
+                Get this from Kontent.ai → Your Profile → API Keys → Subscription API
               </small>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="managementApiKey">Management API Key</label>
               <input
@@ -129,7 +130,7 @@ export function BulkAssignmentDashboard() {
                 onChange={(e) => setApiConfig(prev => ({ ...prev, environmentId: e.target.value }))}
               />
               <small>
-                Get this from your Kontent.ai project URL or Project settings
+                Get this from Kontent.ai → Project Settings → Environment → Environment ID
               </small>
             </div>
 
@@ -147,6 +148,17 @@ export function BulkAssignmentDashboard() {
               </small>
             </div>
           </div>
+          
+          {apiConfig.subscriptionApiKey && apiConfig.managementApiKey && apiConfig.environmentId && apiConfig.subscriptionId && (
+            <div className="api-test-section">
+              <ApiTest apiService={new ApiService(
+                apiConfig.subscriptionApiKey,
+                apiConfig.managementApiKey,
+                apiConfig.environmentId,
+                apiConfig.subscriptionId
+              )} />
+            </div>
+          )}
         </div>
       ) : (
         <>
