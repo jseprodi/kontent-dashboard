@@ -900,52 +900,12 @@ export class ApiService {
         const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391'; // Archived step ID
         
         if (isPublished || isArchived) {
-          console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version...`);
+          console.log(`Item is ${isPublished ? 'published' : 'archived'}, using fallback approach...`);
           
-          // For published/archived items, we need to use the new-version endpoint
-          // This creates a new version that can be modified
+          // For published/archived items, we'll use a fallback approach since the new-version endpoint
+          // seems to be unreliable. We'll try to create a new version by copying and updating.
           try {
-            console.log(`Creating new version for ${isPublished ? 'published' : 'archived'} item using new-version endpoint...`);
-            
-            // Use the new-version endpoint to create a new version
-            await this.managementApi.post(
-              `/items/${itemId}/variants/${languageIdentifier}/new-version`
-            );
-            
-            console.log(`Successfully created new version for item ${itemId}`);
-            
-            // Now get the new version and update its workflow step
-            const newVersion = await this.getContentItem(itemId, languageIdentifier);
-            console.log('Retrieved new version:', newVersion);
-            
-            // Update the workflow step of the new version
-            const updatedVariantData = {
-              ...newVersion,
-              workflow_step: {
-                id: workflowStepId
-              },
-              workflow: {
-                workflow_identifier: newVersion.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                step_identifier: { id: workflowStepId }
-              }
-            };
-            
-            // Remove fields that shouldn't be updated
-            delete updatedVariantData.id;
-            delete updatedVariantData.last_modified;
-            delete updatedVariantData.version;
-            
-            console.log('Updated variant data for new version:', updatedVariantData);
-            
-            // Update the new version with the desired workflow step
-            await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, newVersion.language);
-            console.log(`Successfully updated new version with workflow step ${workflowStepId} for item ${itemId}`);
-            
-          } catch (newVersionError) {
-            console.error('Failed to create new version using new-version endpoint:', newVersionError);
-            
-            // Fallback: try to create new version by copying and updating
-            console.log('Falling back to copy-and-update approach...');
+            console.log(`Creating new version for ${isPublished ? 'published' : 'archived'} item using fallback method...`);
             
             // Create new version data with updated workflow step
             const newVersionData = {
@@ -964,11 +924,52 @@ export class ApiService {
             delete newVersionData.last_modified;
             delete newVersionData.version;
             
-            console.log('Fallback new version data:', newVersionData);
+            console.log('New version data for fallback method:', newVersionData);
             
             // Use the existing upsertLanguageVariant method to create the new version
             await this.upsertLanguageVariant(itemId, languageIdentifier, newVersionData, currentVariant.language);
             console.log(`Successfully created new version with workflow step ${workflowStepId} for item ${itemId} (fallback method)`);
+            
+          } catch (fallbackError) {
+            console.error('Failed to create new version using fallback method:', fallbackError);
+            
+            // If even the fallback fails, try to unpublish first
+            if (isPublished) {
+              console.log('Trying to unpublish item first...');
+              try {
+                await this.managementApi.put(
+                  `/items/${itemId}/variants/${languageIdentifier}/unpublish`
+                );
+                console.log(`Successfully unpublished item ${itemId}`);
+                
+                // Now try to update the workflow step
+                const updatedVariantData = {
+                  ...currentVariant,
+                  workflow_step: {
+                    id: workflowStepId
+                  },
+                  workflow: {
+                    workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                    step_identifier: { id: workflowStepId }
+                  }
+                };
+                
+                delete updatedVariantData.id;
+                delete updatedVariantData.last_modified;
+                delete updatedVariantData.version;
+                
+                await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
+                console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} after unpublishing`);
+                
+                             } catch (unpublishError) {
+                 console.error('Failed to unpublish item:', unpublishError);
+                 const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
+                 throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
+               }
+             } else {
+               const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+               throw new Error(`Cannot modify archived content item: ${errorMessage}`);
+             }
           }
         } else {
           // For draft items, we can update the variant directly
@@ -1036,50 +1037,10 @@ export class ApiService {
             const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391';
             
             if (isPublished || isArchived) {
-              console.log(`Item is ${isPublished ? 'published' : 'archived'} with resolved language, creating new version...`);
+              console.log(`Item is ${isPublished ? 'published' : 'archived'} with resolved language, using fallback approach...`);
               
               try {
-                console.log(`Creating new version for ${isPublished ? 'published' : 'archived'} item using new-version endpoint (resolved language)...`);
-                
-                // Use the new-version endpoint to create a new version
-                await this.managementApi.post(
-                  `/items/${itemId}/variants/${language.id}/new-version`
-                );
-                
-                console.log(`Successfully created new version for item ${itemId} with resolved language ID: ${language.id}`);
-                
-                // Now get the new version and update its workflow step
-                const newVersion = await this.getContentItem(itemId, language.id);
-                console.log('Retrieved new version (resolved language):', newVersion);
-                
-                // Update the workflow step of the new version
-                const updatedVariantData = {
-                  ...newVersion,
-                  workflow_step: {
-                    id: workflowStepId
-                  },
-                  workflow: {
-                    workflow_identifier: newVersion.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                    step_identifier: { id: workflowStepId }
-                  }
-                };
-                
-                // Remove fields that shouldn't be updated
-                delete updatedVariantData.id;
-                delete updatedVariantData.last_modified;
-                delete updatedVariantData.version;
-                
-                console.log('Updated variant data for new version (resolved language):', updatedVariantData);
-                
-                // Update the new version with the desired workflow step
-                await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, newVersion.language);
-                console.log(`Successfully updated new version with workflow step ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
-                
-              } catch (newVersionError) {
-                console.error('Failed to create new version using new-version endpoint (resolved language):', newVersionError);
-                
-                // Fallback: try to create new version by copying and updating
-                console.log('Falling back to copy-and-update approach (resolved language)...');
+                console.log(`Creating new version for ${isPublished ? 'published' : 'archived'} item using fallback method (resolved language)...`);
                 
                 // Create new version data with updated workflow step
                 const newVersionData = {
@@ -1098,11 +1059,52 @@ export class ApiService {
                 delete newVersionData.last_modified;
                 delete newVersionData.version;
                 
-                console.log('Fallback new version data (resolved language):', newVersionData);
+                console.log('New version data for fallback method (resolved language):', newVersionData);
                 
                 // Use the existing upsertLanguageVariant method to create the new version
                 await this.upsertLanguageVariant(itemId, language.id, newVersionData, currentVariant.language);
                 console.log(`Successfully created new version with workflow step ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id} (fallback method)`);
+                
+              } catch (fallbackError) {
+                console.error('Failed to create new version using fallback method (resolved language):', fallbackError);
+                
+                // If even the fallback fails, try to unpublish first
+                if (isPublished) {
+                  console.log('Trying to unpublish item first (resolved language)...');
+                  try {
+                    await this.managementApi.put(
+                      `/items/${itemId}/variants/${language.id}/unpublish`
+                    );
+                    console.log(`Successfully unpublished item ${itemId} with resolved language ID: ${language.id}`);
+                    
+                    // Now try to update the workflow step
+                    const updatedVariantData = {
+                      ...currentVariant,
+                      workflow_step: {
+                        id: workflowStepId
+                      },
+                      workflow: {
+                        workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                        step_identifier: { id: workflowStepId }
+                      }
+                    };
+                    
+                    delete updatedVariantData.id;
+                    delete updatedVariantData.last_modified;
+                    delete updatedVariantData.version;
+                    
+                    await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
+                    console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id} after unpublishing`);
+                    
+                  } catch (unpublishError) {
+                    console.error('Failed to unpublish item (resolved language):', unpublishError);
+                    const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
+                    throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
+                  }
+                } else {
+                  const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+                  throw new Error(`Cannot modify archived content item: ${errorMessage}`);
+                }
               }
             } else {
               // For draft items, update variant directly
