@@ -345,63 +345,89 @@ export class ApiService {
    */
   async upsertLanguageVariant(
     itemId: string, 
-    languageCodename: string, 
+    languageIdentifier: string, 
     variantData: any,
     languageInfo?: any
   ): Promise<void> {
     try {
-      console.log(`Upserting variant for item ${itemId} with language: ${languageCodename}`);
+      console.log(`Upserting variant for item ${itemId} with language identifier: ${languageIdentifier}`);
       console.log('Variant data to upsert:', JSON.stringify(variantData, null, 2));
       
-      // Try using the language codename first
-      try {
-        await this.managementApi.put(
-          `/items/${itemId}/variants/${languageCodename}`,
-          variantData
-        );
-        console.log(`Successfully upserted variant with codename: ${languageCodename}`);
-      } catch (error) {
-        console.log(`Failed to upsert with codename '${languageCodename}', trying with language ID...`);
-        console.log('Original error:', error); if (error && typeof error === 'object' && 'response' in error && error.response) { console.log('API Response Status:', (error as any).response.status); console.log('API Response Data:', (error as any).response.data); }
-        
-        // If codename fails, try to find the language ID and use that
+      // Check if the language identifier is a GUID (language ID) or a codename
+      const isLanguageId = languageIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      
+      if (isLanguageId) {
+        // It's a language ID, use it directly
+        console.log(`Language identifier '${languageIdentifier}' is a language ID, using directly`);
         try {
-          let language;
-          if (languageInfo) {
-            // Use the language info we already have
-            language = languageInfo;
-            console.log(`Using provided language info:`, language);
-          } else {
-            // Fallback to fetching languages if not provided
-            const languages = await this.getLanguages();
-            language = languages.find(lang => lang.codename === languageCodename);
+          await this.managementApi.put(
+            `/items/${itemId}/variants/${languageIdentifier}`,
+            variantData
+          );
+          console.log(`Successfully upserted variant with language ID: ${languageIdentifier}`);
+          return;
+        } catch (error) {
+          console.error(`Failed to upsert with language ID '${languageIdentifier}':`, error);
+          throw error;
+        }
+      } else {
+        // It's a language codename, try using it first, then fall back to ID
+        console.log(`Language identifier '${languageIdentifier}' appears to be a codename`);
+        
+        try {
+          // Try using the language codename first
+          await this.managementApi.put(
+            `/items/${itemId}/variants/${languageIdentifier}`,
+            variantData
+          );
+          console.log(`Successfully upserted variant with codename: ${languageIdentifier}`);
+        } catch (error) {
+          console.log(`Failed to upsert with codename '${languageIdentifier}', trying with language ID...`);
+          console.log('Original error:', error); 
+          if (error && typeof error === 'object' && 'response' in error && error.response) { 
+            console.log('API Response Status:', (error as any).response.status); 
+            console.log('API Response Data:', (error as any).response.data); 
           }
           
-          if (language) {
-            console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
-            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}`);
+          // If codename fails, try to find the language ID and use that
+          try {
+            let language;
+            if (languageInfo) {
+              // Use the language info we already have
+              language = languageInfo;
+              console.log(`Using provided language info:`, language);
+            } else {
+              // Fallback to fetching languages if not provided
+              const languages = await this.getLanguages();
+              language = languages.find(lang => lang.codename === languageIdentifier);
+            }
             
-            await this.managementApi.put(
-              `/items/${itemId}/variants/${language.id}`,
-              variantData
-            );
-            console.log(`Successfully upserted variant with language ID: ${language.id}`);
-          } else {
-            console.log(`Language not found for codename: ${languageCodename}`);
-            throw new Error(`Language not found for codename: ${languageCodename}`);
+            if (language) {
+              console.log(`Found language ID: ${language.id} for codename: ${languageIdentifier}`);
+              console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}`);
+              
+              await this.managementApi.put(
+                `/items/${itemId}/variants/${language.id}`,
+                variantData
+              );
+              console.log(`Successfully upserted variant with language ID: ${language.id}`);
+            } else {
+              console.log(`Language not found for codename: ${languageIdentifier}`);
+              throw new Error(`Language not found for codename: ${languageIdentifier}`);
+            }
+          } catch (languageError) {
+            console.error('Error finding language ID:', languageError);
+            console.error('Language error details:', languageError);
+            
+            // Check if this is a published variant error
+            if (error && typeof error === 'object' && 'response' in error && 
+                (error as any).response?.status === 400 && 
+                (error as any).response?.data?.message?.includes('published and cannot be updated')) {
+              throw new Error('Cannot update published content item. Please create a new version first.');
+            }
+            
+            throw error; // Re-throw the original error
           }
-        } catch (languageError) {
-          console.error('Error finding language ID:', languageError);
-          console.error('Language error details:', languageError);
-          
-          // Check if this is a published variant error
-          if (error && typeof error === 'object' && 'response' in error && 
-              (error as any).response?.status === 400 && 
-              (error as any).response?.data?.message?.includes('published and cannot be updated')) {
-            throw new Error('Cannot update published content item. Please create a new version first.');
-          }
-          
-          throw error; // Re-throw the original error
         }
       }
     } catch (error) {
@@ -432,85 +458,109 @@ export class ApiService {
     try {
       console.log(`Assigning contributors to item ${itemId} with language: ${languageIdentifier}`);
       
-      // First, try to get the specific language variant
-      let currentVariant;
+      // First, resolve the language identifier to get the actual language ID and info
       let actualLanguageId = null;
       let languageInfo = null;
       
       try {
-        currentVariant = await this.getContentItem(itemId, languageIdentifier);
-        console.log(`Found variant for language: ${languageIdentifier}`);
+        // If we have a language codename, resolve it to an ID
+        if (!languageIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          console.log(`Language identifier '${languageIdentifier}' appears to be a codename, resolving to ID...`);
+          const languages = await this.getLanguages();
+          const language = languages.find(lang => lang.codename === languageIdentifier);
+          if (language) {
+            actualLanguageId = language.id;
+            languageInfo = language;
+            console.log(`Resolved language codename '${languageIdentifier}' to ID: ${actualLanguageId}`);
+          } else {
+            throw new Error(`Language with codename '${languageIdentifier}' not found`);
+          }
+        } else {
+          // It's already a language ID
+          actualLanguageId = languageIdentifier;
+          console.log(`Language identifier '${languageIdentifier}' is already an ID`);
+        }
       } catch (error) {
-        console.log(`Language variant '${languageIdentifier}' not found, trying to find available variants...`);
+        console.error('Error resolving language identifier:', error);
+        throw new Error(`Could not resolve language identifier '${languageIdentifier}': ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      // Now try to get the specific language variant using the resolved ID
+      let currentVariant;
+      try {
+        currentVariant = await this.getContentItem(itemId, actualLanguageId);
+        console.log(`Found variant for language ID: ${actualLanguageId}`);
+      } catch (error) {
+        console.log(`Language variant with ID '${actualLanguageId}' not found, trying to find available variants...`);
         
         // If the specific language doesn't exist, try to get all variants
         try {
           const variants = await this.getContentItemVariants(itemId);
           console.log('Available variants:', variants);
           
-                      if (variants.length > 0) {
-              // Get the first available variant
-              const firstVariant = variants[0];
-              const variantLanguageId = firstVariant.language?.id;
+          if (variants.length > 0) {
+            // Get the first available variant
+            const firstVariant = variants[0];
+            const variantLanguageId = firstVariant.language?.id;
+            
+            console.log(`First variant language ID from API: ${variantLanguageId}`);
+            
+            // Get all languages to find the actual language ID
+            try {
+              const languages = await this.getLanguages();
+              console.log('Available languages:', languages);
               
-              console.log(`First variant language ID from API: ${variantLanguageId}`);
-              
-              // Get all languages to find the actual language ID
-              try {
-                const languages = await this.getLanguages();
-                console.log('Available languages:', languages);
+              // The variant language ID is the actual language ID from Kontent.ai
+              if (variantLanguageId) {
+                // Verify this language ID exists in our languages list
+                let language = languages.find(lang => lang.id === variantLanguageId);
                 
-                                                  // The variant language ID is the actual language ID from Kontent.ai
-                 if (variantLanguageId) {
-                   // Verify this language ID exists in our languages list
-                   let language = languages.find(lang => lang.id === variantLanguageId);
-                   
-                   if (language) {
-                     actualLanguageId = language.id;
-                     languageInfo = language;
-                     console.log(`Using variant language: ${language.codename} -> ${language.id}`);
-                   } else {
-                     console.log(`Language with ID ${variantLanguageId} not found in languages list, finding default...`);
-                     // Fall back to finding a default language
-                     const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
-                     if (defaultLanguage) {
-                       actualLanguageId = defaultLanguage.id;
-                       languageInfo = defaultLanguage;
-                       console.log(`Using default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
-                     } else if (languages.length > 0) {
-                       actualLanguageId = languages[0].id;
-                       languageInfo = languages[0];
-                       console.log(`Using first available language: ${languages[0].codename} -> ${languages[0].id}`);
-                     } else {
-                       throw new Error('No languages available in the project');
-                     }
-                   }
-                 } else {
-                   console.log('No language ID found in variant, finding default language...');
-                   // Try to find a default language
-                   const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
-                   if (defaultLanguage) {
-                     actualLanguageId = defaultLanguage.id;
-                     languageInfo = defaultLanguage;
-                     console.log(`Found default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
-                   } else if (languages.length > 0) {
-                     // If no default language found, use the first available language
-                     const firstLanguage = languages[0];
-                     actualLanguageId = firstLanguage.id;
-                     languageInfo = firstLanguage;
-                     console.log(`Using first available language: ${firstLanguage.codename} -> ${firstLanguage.id}`);
-                   } else {
-                     throw new Error('No languages available in the project');
-                   }
-                 }
-               } catch (languagesError) {
-                 console.error('Error getting languages:', languagesError);
-                 throw new Error('Could not determine language for content item variant');
-               }
-             
-             // Use the variant data we already have instead of fetching it again
-             console.log(`Using existing variant data with language ID: ${actualLanguageId}`);
-             currentVariant = firstVariant;
+                if (language) {
+                  actualLanguageId = language.id;
+                  languageInfo = language;
+                  console.log(`Using variant language: ${language.codename} -> ${language.id}`);
+                } else {
+                  console.log(`Language with ID ${variantLanguageId} not found in languages list, finding default...`);
+                  // Fall back to finding a default language
+                  const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
+                  if (defaultLanguage) {
+                    actualLanguageId = defaultLanguage.id;
+                    languageInfo = defaultLanguage;
+                    console.log(`Using default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
+                  } else if (languages.length > 0) {
+                    actualLanguageId = languages[0].id;
+                    languageInfo = languages[0];
+                    console.log(`Using first available language: ${languages[0].codename} -> ${languages[0].id}`);
+                  } else {
+                    throw new Error('No languages available in the project');
+                  }
+                }
+              } else {
+                console.log('No language ID found in variant, finding default language...');
+                // Try to find a default language
+                const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
+                if (defaultLanguage) {
+                  actualLanguageId = defaultLanguage.id;
+                  languageInfo = defaultLanguage;
+                  console.log(`Found default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
+                } else if (languages.length > 0) {
+                  // If no default language found, use the first available language
+                  const firstLanguage = languages[0];
+                  actualLanguageId = firstLanguage.id;
+                  languageInfo = firstLanguage;
+                  console.log(`Using first available language: ${firstLanguage.codename} -> ${firstLanguage.id}`);
+                } else {
+                  throw new Error('No languages available in the project');
+                }
+              }
+            } catch (languagesError) {
+              console.error('Error getting languages:', languagesError);
+              throw new Error('Could not determine language for content item variant');
+            }
+            
+            // Use the variant data we already have instead of fetching it again
+            console.log(`Using existing variant data with language ID: ${actualLanguageId}`);
+            currentVariant = firstVariant;
           } else {
             throw new Error('No language variants found for this content item');
           }
@@ -552,22 +602,25 @@ export class ApiService {
       }
       
       if ((isPublished || isArchived) && draftStepId) {
-        console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version and setting to draft...`);
+        console.log(`Item is ${isPublished ? 'published' : 'archived'}, updating workflow step to draft...`);
         
         try {
-          // Create new version and set to draft, and get the new variant data
-          const newDraftVariant = await this.createNewVersionAndSetToDraft(
-            itemId, 
-            actualLanguageId || languageIdentifier, 
-            draftStepId
-          );
-          console.log('Successfully created new version and set to draft');
-          currentVariant = newDraftVariant; // Update currentVariant to the new draft version
-          console.log('Updated current variant to new draft version:', currentVariant);
-          console.log('New variant workflow step:', currentVariant.workflow_step);
+          // For published/archived items, we'll update the existing variant to the draft step
+          // This is simpler and more reliable than trying to create a "new version"
+          console.log(`Updating workflow step to draft step: ${draftStepId}`);
+          
+          // Update the current variant's workflow step to draft
+          currentVariant.workflow_step = { id: draftStepId };
+          currentVariant.workflow = {
+            workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+            step_identifier: { id: draftStepId }
+          };
+          
+          console.log('Updated current variant workflow step to draft:', currentVariant.workflow_step);
+          console.log('Updated current variant workflow to draft:', currentVariant.workflow);
         } catch (workflowError) {
-          console.error('Failed to create new version and set to draft:', workflowError);
-          throw new Error('Failed to create new version for published/archived content item'); // Re-throw to stop assignment
+          console.error('Failed to update workflow step to draft:', workflowError);
+          throw new Error('Failed to update workflow step for published/archived content item');
         }
       }
       
@@ -596,7 +649,7 @@ export class ApiService {
       console.log('Final workflow in updated variant:', updatedVariant.workflow);
 
       // Upsert the updated variant using the actual language ID and language info
-      await this.upsertLanguageVariant(itemId, actualLanguageId || languageIdentifier, updatedVariant, languageInfo);
+      await this.upsertLanguageVariant(itemId, actualLanguageId, updatedVariant, languageInfo);
       console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
     } catch (error) {
       console.error('Error assigning contributors:', error);
@@ -895,86 +948,7 @@ export class ApiService {
     }
   }
 
-  /**
-   * Create a new draft variant for a published/archived content item
-   * Returns the new variant data for further use
-   */
-  async createNewVersionAndSetToDraft(
-    itemId: string,
-    languageIdentifier: string,
-    draftStepId: string
-  ): Promise<any> {
-    try {
-      console.log(`Creating new draft variant for item ${itemId} and setting to draft step ${draftStepId}`);
-      console.log(`Using language identifier: ${languageIdentifier}`);
-      
-      // For the Management API v2, we need to use the language codename, not the ID
-      let languageCodename = languageIdentifier;
-      
-      // If we have a language ID (GUID), we need to find the corresponding codename
-      if (languageIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        console.log('Language identifier is a GUID, finding corresponding codename...');
-        try {
-          const languages = await this.getLanguages();
-          const language = languages.find(lang => lang.id === languageIdentifier);
-          if (language) {
-            languageCodename = language.codename;
-            console.log(`Found language codename: ${languageCodename} for ID: ${languageIdentifier}`);
-          } else {
-            console.warn(`Language with ID ${languageIdentifier} not found, using ID as fallback`);
-          }
-        } catch (error) {
-          console.warn('Could not resolve language ID to codename, using ID as fallback:', error);
-        }
-      }
-      
-      console.log(`Using language codename: ${languageCodename}`);
-      
-      // Instead of trying to create a "new version" (which doesn't exist in Management API v2),
-      // we'll create a new variant by copying the existing one and setting it to draft
-      try {
-        // First, get the current variant to copy its data
-        const currentVariant = await this.getContentItem(itemId, languageCodename);
-        console.log('Retrieved current variant for copying:', currentVariant);
-        
-        // Create a new variant by copying the existing one
-        // The Management API v2 allows us to create variants by providing the full variant data
-        const newVariantData = {
-          ...currentVariant,
-          // Remove any fields that shouldn't be copied
-          id: undefined,
-          last_modified: undefined,
-          // Set the workflow step to draft
-          workflow_step: {
-            id: draftStepId
-          }
-        };
-        
-        console.log('Creating new variant with draft workflow step...');
-        
-        // Create the new variant by upserting with the draft workflow step
-        await this.upsertLanguageVariant(itemId, languageCodename, newVariantData);
-        console.log('New draft variant created successfully');
-        
-        // Get the updated variant data to return
-        console.log('Fetching updated variant data...');
-        const newVariant = await this.getContentItem(itemId, languageCodename);
-        console.log('Retrieved new variant data after creation:', newVariant);
-        console.log('New variant workflow step:', newVariant.workflow_step);
-        console.log('New variant workflow:', newVariant.workflow);
-        
-        return newVariant;
-        
-      } catch (error) {
-        console.error(`Failed to create new draft variant:`, error);
-        throw new Error(`Failed to create new draft variant: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-      
-    } catch (error) {
-      console.error('Error creating new draft variant and setting to draft:', error);
-      throw new Error('Failed to create new draft variant and set to draft');
-    }
-  }
+
 
   /**
    * Resolve email addresses to Kontent.ai user IDs
