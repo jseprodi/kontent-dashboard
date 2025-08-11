@@ -849,43 +849,51 @@ export class ApiService {
    */
   async createNewVersionAndSetToDraft(
     itemId: string,
-    languageCodename: string,
+    languageIdentifier: string,
     draftStepId: string
   ): Promise<any> {
     try {
       console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
+      console.log(`Using language identifier: ${languageIdentifier}`);
       
       // First, create a new version
       try {
         await this.managementApi.post(
-          `/items/${itemId}/variants/${languageCodename}/new-version`
+          `/items/${itemId}/variants/${languageIdentifier}/new-version`
         );
         console.log('New version created successfully');
       } catch (error) {
-        console.log(`Failed to create new version with codename '${languageCodename}', trying with language ID...`);
+        console.log(`Failed to create new version with identifier '${languageIdentifier}', trying to resolve language...`);
         
-        // If codename fails, try with language ID
-        const languages = await this.getLanguages();
-        const language = languages.find(lang => lang.codename === languageCodename);
-        
-        if (language) {
-          await this.managementApi.post(
-            `/items/${itemId}/variants/${language.id}/new-version`
-          );
-          console.log('New version created successfully with language ID');
-        } else {
-          throw new Error(`Language not found for codename: ${languageCodename}`);
+        // If the identifier fails, try to resolve it as a codename to get the ID
+        try {
+          const languages = await this.getLanguages();
+          const language = languages.find(lang => lang.codename === languageIdentifier);
+          
+          if (language) {
+            console.log(`Found language: ${language.codename} -> ${language.id}`);
+            await this.managementApi.post(
+              `/items/${itemId}/variants/${language.id}/new-version`
+            );
+            console.log('New version created successfully with resolved language ID');
+          } else {
+            throw new Error(`Language not found for codename: ${languageIdentifier}`);
+          }
+        } catch (resolveError) {
+          console.error('Failed to resolve language identifier:', resolveError);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          throw new Error(`Failed to create new version: ${errorMessage}`);
         }
       }
       
       // Then change the workflow step to draft
       console.log('Changing workflow step to draft...');
-      await this.changeWorkflowStep(itemId, languageCodename, draftStepId);
+      await this.changeWorkflowStep(itemId, languageIdentifier, draftStepId);
       console.log('Workflow step changed to draft successfully');
       
       // Get the updated variant data to return
       console.log('Fetching updated variant data...');
-      const newVariant = await this.getContentItem(itemId, languageCodename);
+      const newVariant = await this.getContentItem(itemId, languageIdentifier);
       console.log('Retrieved new variant data after workflow change:', newVariant);
       console.log('New variant workflow step:', newVariant.workflow_step);
       console.log('New variant workflow:', newVariant.workflow);
