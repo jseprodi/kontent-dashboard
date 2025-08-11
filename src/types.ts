@@ -62,6 +62,11 @@ export interface ContentItem {
     codename: string;
   };
   contributors?: string[];
+  workflow_step?: {
+    id: string;
+    codename: string;
+    name: string;
+  };
 }
 
 export interface ContentType {
@@ -97,6 +102,42 @@ export interface SubscriptionApiResponse<T> {
 
 export interface ManagementApiResponse<T> {
   data: T;
+}
+
+// Workflow-related types based on Kontent.ai Management API v2
+export interface WorkflowStep {
+  id: string;
+  name: string;
+  codename: string;
+  color?: string;
+  role_ids?: string[];
+  unpublish_role_ids?: string[];
+  create_new_version_role_ids?: string[];
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  codename: string;
+  scopes: string[];
+  steps: WorkflowStep[];
+  published_step?: WorkflowStep;
+  scheduled_step?: WorkflowStep;
+  archived_step?: WorkflowStep;
+}
+
+export interface CreateWorkflowRequest {
+  name: string;
+  codename: string;
+  scopes: string[];
+  steps: WorkflowStep[];
+  published_step?: WorkflowStep;
+  scheduled_step?: WorkflowStep;
+  archived_step?: WorkflowStep;
+}
+
+export interface UpdateWorkflowRequest extends Partial<CreateWorkflowRequest> {
+  // All fields are optional for updates
 }
 
 

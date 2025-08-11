@@ -48,7 +48,8 @@ export function useBulkAssignment({ apiService }: UseBulkAssignmentProps): UseBu
 
       console.log('Bulk assignment requests:', assignments);
 
-      const results = await apiService.bulkAssignContributors(assignments);
+      // Use the new workflow management method that automatically handles workflow step changes
+      const results = await apiService.bulkAssignContributorsWithWorkflowManagement(assignments);
       setAssignmentResults(results);
     } catch (error) {
       console.error('Error during bulk assignment:', error);

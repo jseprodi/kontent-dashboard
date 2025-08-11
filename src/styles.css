@@ -856,3 +856,413 @@ body {
     gap: 12px;
   }
 } 
+
+/* Workflow Manager Styles */
+.workflow-manager {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.workflow-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.workflow-header h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.workflow-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.workflow-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+
+.workflow-list h3,
+.workflow-details h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #374151;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.workflow-grid {
+  display: grid;
+  gap: 15px;
+}
+
+.workflow-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.workflow-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-card.selected {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.workflow-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.workflow-card-header h4 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.workflow-codename {
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.workflow-steps {
+  margin-bottom: 15px;
+}
+
+.workflow-steps p {
+  margin: 5px 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.workflow-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.workflow-details {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.workflow-info p {
+  margin: 8px 0;
+  color: #374151;
+}
+
+.workflow-steps-detail {
+  margin-top: 20px;
+}
+
+.workflow-steps-detail h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #374151;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.steps-list {
+  display: grid;
+  gap: 15px;
+}
+
+.step-item {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.step-name {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.step-codename {
+  background: #e5e7eb;
+  color: #6b7280;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.step-details p {
+  margin: 5px 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.special-steps {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.special-steps h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #374151;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.special-steps p {
+  margin: 8px 0;
+  color: #374151;
+}
+
+.workflow-usage {
+  background: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.workflow-usage h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #0c4a6e;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.workflow-usage p {
+  margin: 10px 0;
+  color: #0c4a6e;
+  line-height: 1.6;
+}
+
+.workflow-usage ul {
+  margin: 15px 0;
+  padding-left: 20px;
+}
+
+.workflow-usage li {
+  margin: 8px 0;
+  color: #0c4a6e;
+  line-height: 1.5;
+}
+
+.info-message {
+  background: #ecfdf5;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.info-message p {
+  margin: 8px 0;
+  color: #065f46;
+}
+
+.info-message strong {
+  color: #047857;
+}
+
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.error-message p {
+  margin: 8px 0;
+  color: #991b1b;
+}
+
+.error-message button {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.error-message button:hover {
+  background: #dc2626;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .workflow-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .workflow-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+} 
+
+/* Integration App Styles */
+.integration-app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.app-header h1 {
+  margin: 0 0 10px 0;
+  color: #1f2937;
+  font-size: 2.25rem;
+  font-weight: 700;
+}
+
+.app-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1.125rem;
+}
+
+.tab-navigation {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  color: #3b82f6;
+  background-color: #f8fafc;
+}
+
+.tab-button.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.tab-content {
+  min-height: 500px;
+}
+
+/* API Configuration Setup */
+.api-keys-setup {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 30px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.setup-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.setup-header h2 {
+  margin: 0 0 10px 0;
+  color: #1f2937;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.api-keys-setup p {
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.api-keys-form {
+  display: grid;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.form-group input {
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-group small {
+  color: #6b7280;
+  font-size: 0.75rem;
+  line-height: 1.4;
+} 

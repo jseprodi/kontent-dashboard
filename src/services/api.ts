@@ -5,7 +5,10 @@ import {
   ContentType,
   AssignmentRequest,
   SubscriptionApiResponse,
-  ManagementApiResponse
+  ManagementApiResponse,
+  Workflow,
+  CreateWorkflowRequest,
+  UpdateWorkflowRequest
 } from '../types';
 
 export class ApiService {
@@ -460,7 +463,8 @@ export class ApiService {
   async assignContributors(
     itemId: string,
     languageCodename: string,
-    contributorEmails: string[]
+    contributorEmails: string[],
+    draftStepId?: string
   ): Promise<void> {
     try {
       console.log(`Assigning contributors to item ${itemId} with language: ${languageCodename}`);
@@ -527,6 +531,28 @@ export class ApiService {
       
       console.log('Current variant:', currentVariant);
       
+      // Check if the item is published or archived and needs workflow step change
+      const currentWorkflowStep = currentVariant.workflow_step;
+      const isPublished = currentWorkflowStep?.codename === 'published';
+      const isArchived = currentWorkflowStep?.codename === 'archived';
+      
+      if ((isPublished || isArchived) && draftStepId) {
+        console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version and setting to draft...`);
+        
+        try {
+          // Create new version and set to draft
+          await this.createNewVersionAndSetToDraft(
+            itemId, 
+            actualLanguageId || languageCodename, 
+            draftStepId
+          );
+          console.log('Successfully created new version and set to draft');
+        } catch (workflowError) {
+          console.error('Failed to create new version and set to draft:', workflowError);
+          // Continue with contributor assignment even if workflow change fails
+        }
+      }
+      
       // Try the simpler approach first - update just the contributors field
       try {
         console.log('Trying simple contributors update...');
@@ -562,7 +588,10 @@ export class ApiService {
   /**
    * Bulk assign contributors to multiple content items
    */
-  async bulkAssignContributors(assignments: AssignmentRequest[]): Promise<any[]> {
+  async bulkAssignContributors(
+    assignments: AssignmentRequest[], 
+    draftStepId?: string
+  ): Promise<any[]> {
     const results = [];
     
     for (const assignment of assignments) {
@@ -570,7 +599,8 @@ export class ApiService {
         await this.assignContributors(
           assignment.contentItemId,
           assignment.languageCodename,
-          assignment.contributors
+          assignment.contributors,
+          draftStepId
         );
         
         results.push({
@@ -588,5 +618,389 @@ export class ApiService {
     }
     
     return results;
+  }
+
+  // ===== WORKFLOW MANAGEMENT METHODS =====
+
+  /**
+   * Get all workflows for the environment
+   */
+  async getWorkflows(): Promise<Workflow[]> {
+    try {
+      console.log('Making request to workflows API...');
+      const response = await this.managementApi.get<ManagementApiResponse<Workflow[]>>('/workflows');
+      
+      console.log('Workflows API response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      // Handle different response structures
+      let workflows: any[] = [];
+      const responseData = response.data as any;
+      
+      if (Array.isArray(responseData)) {
+        workflows = responseData;
+      } else if (responseData && Array.isArray(responseData.data)) {
+        workflows = responseData.data;
+      } else if (responseData && responseData.workflows && Array.isArray(responseData.workflows)) {
+        workflows = responseData.workflows;
+      } else if (responseData && responseData.items && Array.isArray(responseData.items)) {
+        workflows = responseData.items;
+      } else {
+        console.error('Unexpected response format:', responseData);
+        throw new Error(`Invalid response format from workflows API. Expected array, got: ${typeof responseData}`);
+      }
+      
+      console.log('Processed workflows:', workflows);
+      return workflows;
+    } catch (error: any) {
+      console.error('Error fetching workflows - Full error:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to fetch workflows: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        console.error('Request was made but no response received:', error.request);
+        throw new Error('Failed to fetch workflows: No response received from server');
+      } else {
+        console.error('Error setting up request:', error.message);
+        throw new Error(`Failed to fetch workflows: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Get a specific workflow by ID or codename
+   */
+  async getWorkflow(workflowIdentifier: string): Promise<Workflow> {
+    try {
+      console.log(`Getting workflow: ${workflowIdentifier}`);
+      const response = await this.managementApi.get<Workflow>(`/workflows/${workflowIdentifier}`);
+      
+      console.log('Workflow response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching workflow:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        throw new Error(`Failed to fetch workflow: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        throw new Error('Failed to fetch workflow: No response received from server');
+      } else {
+        throw new Error(`Failed to fetch workflow: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Create a new workflow
+   */
+  async createWorkflow(workflowData: CreateWorkflowRequest): Promise<Workflow> {
+    try {
+      console.log('Creating new workflow:', workflowData);
+      const response = await this.managementApi.post<Workflow>('/workflows', workflowData);
+      
+      console.log('Create workflow response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Error creating workflow:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        throw new Error(`Failed to create workflow: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        throw new Error('Failed to create workflow: No response received from server');
+      } else {
+        throw new Error(`Failed to create workflow: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Update an existing workflow
+   */
+  async updateWorkflow(workflowIdentifier: string, workflowData: UpdateWorkflowRequest): Promise<Workflow> {
+    try {
+      console.log(`Updating workflow ${workflowIdentifier}:`, workflowData);
+      const response = await this.managementApi.put<Workflow>(`/workflows/${workflowIdentifier}`, workflowData);
+      
+      console.log('Update workflow response:', response);
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('Error updating workflow:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        throw new Error(`Failed to update workflow: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+      } else if (error.request) {
+        throw new Error('Failed to update workflow: No response received from server');
+      } else {
+        throw new Error(`Failed to update workflow: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Delete a workflow
+   */
+  async deleteWorkflow(workflowIdentifier: string): Promise<void> {
+    try {
+      console.log(`Deleting workflow: ${workflowIdentifier}`);
+      const response = await this.managementApi.delete(`/workflows/${workflowIdentifier}`);
+      
+      console.log('Delete workflow response:', response);
+      console.log('Response status:', response.status);
+      
+      if (response.status === 204) {
+        console.log('Workflow deleted successfully');
+      } else {
+        console.log('Unexpected response status for delete:', response.status);
+      }
+    } catch (error: any) {
+      console.error('Error deleting workflow:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        
+        // Handle specific error cases based on the API documentation
+        if (error.response.status === 400) {
+          throw new Error('Cannot delete workflow: It is in use or is the default workflow');
+        } else if (error.response.status === 404) {
+          throw new Error('Workflow not found');
+        } else {
+          throw new Error(`Failed to delete workflow: ${error.response.status} - ${error.response.data?.message || error.response.statusText}`);
+        }
+      } else if (error.request) {
+        throw new Error('Failed to delete workflow: No response received from server');
+      } else {
+        throw new Error(`Failed to delete workflow: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Change the workflow step of a content item
+   */
+  async changeWorkflowStep(
+    itemId: string,
+    languageCodename: string,
+    workflowStepId: string
+  ): Promise<void> {
+    try {
+      console.log(`Changing workflow step for item ${itemId} to step ${workflowStepId}`);
+      
+      // Try using the language codename first
+      try {
+        await this.managementApi.put(
+          `/items/${itemId}/variants/${languageCodename}/workflow`,
+          {
+            workflow_step: {
+              id: workflowStepId
+            }
+          }
+        );
+        console.log(`Successfully changed workflow step with codename: ${languageCodename}`);
+      } catch (error) {
+        console.log(`Failed to change workflow step with codename '${languageCodename}', trying with language ID...`);
+        console.log('Original error:', error);
+        
+        // If codename fails, try with language ID
+        try {
+          const languages = await this.getLanguages();
+          const language = languages.find(lang => lang.codename === languageCodename);
+          
+          if (language) {
+            console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
+            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/workflow`);
+            
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${language.id}/workflow`,
+              {
+                workflow_step: {
+                  id: workflowStepId
+                }
+              }
+            );
+            console.log(`Successfully changed workflow step with language ID: ${language.id}`);
+          } else {
+            console.log(`Language not found for codename: ${languageCodename}`);
+            throw new Error(`Language not found for codename: ${languageCodename}`);
+          }
+        } catch (languageError) {
+          console.error('Error finding language ID:', languageError);
+          console.error('Language error details:', languageError);
+          throw error; // Re-throw the original error
+        }
+      }
+    } catch (error) {
+      console.error('Error changing workflow step:', error);
+      throw new Error('Failed to change workflow step');
+    }
+  }
+
+  /**
+   * Create a new version of a content item and change its workflow step to draft
+   */
+  async createNewVersionAndSetToDraft(
+    itemId: string,
+    languageCodename: string,
+    draftStepId: string
+  ): Promise<void> {
+    try {
+      console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
+      
+      // First, create a new version
+      let newVersionResponse;
+      try {
+        newVersionResponse = await this.managementApi.post(
+          `/items/${itemId}/variants/${languageCodename}/new-version`
+        );
+        console.log('New version created successfully');
+      } catch (error) {
+        console.log(`Failed to create new version with codename '${languageCodename}', trying with language ID...`);
+        
+        // If codename fails, try with language ID
+        const languages = await this.getLanguages();
+        const language = languages.find(lang => lang.codename === languageCodename);
+        
+        if (language) {
+          newVersionResponse = await this.managementApi.post(
+            `/items/${itemId}/variants/${language.id}/new-version`
+          );
+          console.log('New version created successfully with language ID');
+        } else {
+          throw new Error(`Language not found for codename: ${languageCodename}`);
+        }
+      }
+      
+      // Then change the workflow step to draft
+      await this.changeWorkflowStep(itemId, languageCodename, draftStepId);
+      console.log('Workflow step changed to draft successfully');
+      
+    } catch (error) {
+      console.error('Error creating new version and setting to draft:', error);
+      throw new Error('Failed to create new version and set to draft');
+    }
+  }
+
+  /**
+   * Get the default workflow and find the draft step ID
+   */
+  async getDefaultWorkflowDraftStep(): Promise<string | null> {
+    try {
+      console.log('Getting default workflow to find draft step...');
+      
+      // Get all workflows
+      const workflows = await this.getWorkflows();
+      
+      // Find the default workflow (usually the first one or one with specific characteristics)
+      // You might need to adjust this logic based on your specific workflow setup
+      const defaultWorkflow = workflows.find(workflow => 
+        workflow.codename === 'default' || 
+        workflow.name.toLowerCase().includes('default') ||
+        workflow.id === '00000000-0000-0000-0000-000000000000'
+      ) || workflows[0];
+      
+      if (!defaultWorkflow) {
+        console.log('No default workflow found');
+        return null;
+      }
+      
+      console.log('Found default workflow:', defaultWorkflow.name);
+      
+      // Find the draft step (usually the first step that's not published, scheduled, or archived)
+      const draftStep = defaultWorkflow.steps.find(step => 
+        step.codename !== 'published' && 
+        step.codename !== 'scheduled' && 
+        step.codename !== 'archived' &&
+        !step.codename.includes('published') &&
+        !step.codename.includes('scheduled') &&
+        !step.codename.includes('archived')
+      );
+      
+      if (draftStep) {
+        console.log(`Found draft step: ${draftStep.name} (${draftStep.id})`);
+        return draftStep.id;
+      } else {
+        console.log('No draft step found in default workflow');
+        return null;
+      }
+      
+    } catch (error) {
+      console.error('Error getting default workflow draft step:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Assign contributors with automatic workflow step management
+   * This method automatically handles changing workflow steps for published/archived items
+   */
+  async assignContributorsWithWorkflowManagement(
+    itemId: string,
+    languageCodename: string,
+    contributorEmails: string[]
+  ): Promise<void> {
+    try {
+      console.log(`Assigning contributors with workflow management for item ${itemId}`);
+      
+      // Get the draft step ID from the default workflow
+      const draftStepId = await this.getDefaultWorkflowDraftStep();
+      
+      if (draftStepId) {
+        console.log(`Using draft step ID: ${draftStepId}`);
+        await this.assignContributors(itemId, languageCodename, contributorEmails, draftStepId);
+      } else {
+        console.log('No draft step found, assigning contributors without workflow change');
+        await this.assignContributors(itemId, languageCodename, contributorEmails);
+      }
+      
+      console.log('Contributors assigned with workflow management successfully');
+    } catch (error) {
+      console.error('Error assigning contributors with workflow management:', error);
+      throw new Error('Failed to assign contributors with workflow management');
+    }
+  }
+
+  /**
+   * Bulk assign contributors with automatic workflow step management
+   * This method automatically handles changing workflow steps for published/archived items
+   */
+  async bulkAssignContributorsWithWorkflowManagement(
+    assignments: AssignmentRequest[]
+  ): Promise<any[]> {
+    try {
+      console.log('Bulk assigning contributors with workflow management...');
+      
+      // Get the draft step ID from the default workflow
+      const draftStepId = await this.getDefaultWorkflowDraftStep();
+      
+      if (draftStepId) {
+        console.log(`Using draft step ID: ${draftStepId}`);
+        return await this.bulkAssignContributors(assignments, draftStepId);
+      } else {
+        console.log('No draft step found, bulk assigning contributors without workflow change');
+        return await this.bulkAssignContributors(assignments);
+      }
+    } catch (error) {
+      console.error('Error in bulk assignment with workflow management:', error);
+      throw new Error('Failed to bulk assign contributors with workflow management');
+    }
   }
 } 

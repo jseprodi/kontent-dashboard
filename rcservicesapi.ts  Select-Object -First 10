@@ -1,0 +1,5 @@
+[33m4e99af8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix elements format to use array instead of object for API compatibility
+[33mf5a20e3[m Add simpler contributors update method with fallback to full variant upsert
+[33m13b0be5[m Fix duplicate API calls by passing language info to upsertLanguageVariant
+[33mefd1430[m Add enhanced debugging for language ID upsert attempts
+[33me4373b7[m Add fallback to language ID for upsert operations when codename fails
