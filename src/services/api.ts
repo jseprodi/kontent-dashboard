@@ -886,8 +886,8 @@ export class ApiService {
       console.log(`Changing workflow step for item ${itemId} to step ${workflowStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
 
-      // For published/archived items, we need to use the workflow management API
-      // to change the workflow step before we can update the variant
+      // For published/archived items, we need to create a new version
+      // For draft items, we can update the variant directly
       
       try {
         // First, get the current variant to see its current state
@@ -900,39 +900,40 @@ export class ApiService {
         const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391'; // Archived step ID
         
         if (isPublished || isArchived) {
-          console.log(`Item is ${isPublished ? 'published' : 'archived'}, using workflow management API...`);
+          console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version...`);
           
-          // For published/archived items, we need to use the workflow management endpoint
-          // According to Kontent.ai API docs, we need to change the workflow step first
+          // For published/archived items, we need to create a new version
+          // This is the correct approach according to Kontent.ai API documentation
           
-          // Try using the workflow management endpoint
           try {
-            console.log(`Attempting to change workflow step using workflow management API...`);
-            
-            // Use the workflow management endpoint to change the step
-            const response = await this.managementApi.put(
-              `/items/${itemId}/workflow`,
-              {
-                workflow_step: {
-                  id: workflowStepId
-                }
-              }
-            );
-            
-            console.log(`Successfully changed workflow step using workflow management API:`, response.status, response.data);
-            return;
-            
-          } catch (workflowError) {
-            console.log(`Workflow management API failed, trying alternative approach...`);
-            console.log('Workflow error:', workflowError);
-            
-            // If the workflow management endpoint fails, try creating a new version
-            // This is a fallback approach for published/archived items
             console.log(`Creating new version for ${isPublished ? 'published' : 'archived'} item...`);
             
-            // For published/archived items, we might need to create a new version
-            // This is a more complex approach that requires additional API calls
-            throw new Error(`Cannot change workflow step for ${isPublished ? 'published' : 'archived'} item using current approach. Please implement new version creation.`);
+            // Create a new version by copying the current variant data and updating the workflow step
+            const newVersionData = {
+              ...currentVariant,
+              workflow_step: {
+                id: workflowStepId
+              },
+              workflow: {
+                workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                step_identifier: { id: workflowStepId }
+              }
+            };
+            
+            // Remove fields that shouldn't be copied to new version
+            delete newVersionData.id;
+            delete newVersionData.last_modified;
+            delete newVersionData.version;
+            
+            console.log('New version data:', newVersionData);
+            
+            // Create the new version by upserting with the new workflow step
+            await this.upsertLanguageVariant(itemId, languageIdentifier, newVersionData, currentVariant.language);
+            console.log(`Successfully created new version with workflow step ${workflowStepId} for ${isPublished ? 'published' : 'archived'} item ${itemId}`);
+            
+          } catch (versionError) {
+            console.log(`Failed to create new version:`, versionError);
+            throw new Error(`Failed to create new version for ${isPublished ? 'published' : 'archived'} item: ${versionError instanceof Error ? versionError.message : 'Unknown error'}`);
           }
         } else {
           // For draft items, we can update the variant directly
@@ -1000,24 +1001,34 @@ export class ApiService {
             const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391';
             
             if (isPublished || isArchived) {
-              console.log(`Item is ${isPublished ? 'published' : 'archived'} with resolved language, using workflow management API...`);
+              console.log(`Item is ${isPublished ? 'published' : 'archived'} with resolved language, creating new version...`);
               
               try {
-                const response = await this.managementApi.put(
-                  `/items/${itemId}/workflow`,
-                  {
-                    workflow_step: {
-                      id: workflowStepId
-                    }
+                // Create new version data
+                const newVersionData = {
+                  ...currentVariant,
+                  workflow_step: {
+                    id: workflowStepId
+                  },
+                  workflow: {
+                    workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                    step_identifier: { id: workflowStepId }
                   }
-                );
+                };
                 
-                console.log(`Successfully changed workflow step using workflow management API (resolved language):`, response.status, response.data);
-                return;
+                // Remove fields that shouldn't be copied to new version
+                delete newVersionData.id;
+                delete newVersionData.last_modified;
+                delete newVersionData.version;
                 
-              } catch (workflowError) {
-                console.log(`Workflow management API failed with resolved language:`, workflowError);
-                throw new Error(`Cannot change workflow step for ${isPublished ? 'published' : 'archived'} item. Please implement new version creation.`);
+                console.log('New version data (resolved language):', newVersionData);
+                
+                await this.upsertLanguageVariant(itemId, language.id, newVersionData, currentVariant.language);
+                console.log(`Successfully created new version with workflow step ${workflowStepId} for ${isPublished ? 'published' : 'archived'} item ${itemId} (resolved language)`);
+                
+              } catch (versionError) {
+                console.log(`Failed to create new version with resolved language:`, versionError);
+                throw new Error(`Failed to create new version for ${isPublished ? 'published' : 'archived'} item: ${versionError instanceof Error ? versionError.message : 'Unknown error'}`);
               }
             } else {
               // For draft items, update variant directly
