@@ -967,33 +967,19 @@ export class ApiService {
                    throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
                  }
                } else if (isArchived) {
-                 // For archived items, try to unarchive first
-                 console.log('Trying to unarchive item first...');
+                 // For archived items, we need to use the workflow step change endpoint
+                 console.log('Trying to change workflow step for archived item...');
                  try {
-                   // Try to change the workflow step directly to unarchive it
-                   const unarchiveVariantData = {
-                     ...currentVariant,
-                     workflow_step: {
-                       id: workflowStepId
-                     },
-                     workflow: {
-                       workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                       step_identifier: { id: workflowStepId }
-                     }
-                   };
+                   // Use the proper workflow step change endpoint for archived items
+                   await this.managementApi.post(
+                     `/items/${itemId}/variants/${languageIdentifier}/workflow/${workflowStepId}`
+                   );
+                   console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
                    
-                   delete unarchiveVariantData.id;
-                   delete unarchiveVariantData.last_modified;
-                   delete unarchiveVariantData.version;
-                   
-                   // Try to update the archived variant directly
-                   await this.upsertLanguageVariant(itemId, languageIdentifier, unarchiveVariantData, currentVariant.language);
-                   console.log(`Successfully unarchived and updated workflow step to ${workflowStepId} for item ${itemId}`);
-                   
-                 } catch (unarchiveError) {
-                   console.error('Failed to unarchive item:', unarchiveError);
-                   const errorMessage = unarchiveError instanceof Error ? unarchiveError.message : String(unarchiveError);
-                   throw new Error(`Cannot modify archived content item. Failed to unarchive: ${errorMessage}`);
+                 } catch (workflowChangeError) {
+                   console.error('Failed to change workflow step for archived item:', workflowChangeError);
+                   const errorMessage = workflowChangeError instanceof Error ? workflowChangeError.message : String(workflowChangeError);
+                   throw new Error(`Cannot modify archived content item. Failed to change workflow step: ${errorMessage}`);
                  }
                } else {
                  const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
