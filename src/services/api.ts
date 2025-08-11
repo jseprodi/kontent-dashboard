@@ -877,7 +877,7 @@ export class ApiService {
   /**
    * Change the workflow step of a content item
    */
-  async changeWorkflowStep(
+    async changeWorkflowStep(
     itemId: string,
     languageIdentifier: string,
     workflowStepId: string
@@ -885,15 +885,34 @@ export class ApiService {
     try {
       console.log(`Changing workflow step for item ${itemId} to step ${workflowStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
+
+      // Instead of trying to change workflow step via a separate endpoint,
+      // we'll update the variant directly with the new workflow step
+      // This approach is more reliable and follows the standard variant update pattern
       
-      // Try using the provided identifier first (could be codename or ID)
       try {
-        console.log(`Attempting PUT to: /items/${itemId}/variants/${languageIdentifier}/workflow-steps/${workflowStepId}`);
-        const response = await this.managementApi.put(
-          `/items/${itemId}/variants/${languageIdentifier}/workflow-steps/${workflowStepId}`
-        );
-        console.log(`Successfully changed workflow step with identifier: ${languageIdentifier}`);
-        console.log('Workflow change response:', response.status, response.data);
+        // First, get the current variant to see its current state
+        const currentVariant = await this.getContentItem(itemId, languageIdentifier);
+        console.log('Current variant before workflow change:', currentVariant);
+        
+        // Create updated variant data with the new workflow step
+        const updatedVariantData = {
+          ...currentVariant,
+          workflow_step: {
+            id: workflowStepId
+          },
+          workflow: {
+            workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+            step_identifier: { id: workflowStepId }
+          }
+        };
+        
+        console.log('Updated variant data for workflow change:', updatedVariantData);
+        
+        // Update the variant with the new workflow step
+        await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
+        console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId}`);
+        
       } catch (error) {
         console.log(`Failed to change workflow step with identifier '${languageIdentifier}', trying to resolve language...`);
         console.log('Original error:', error);
@@ -926,13 +945,28 @@ export class ApiService {
           
           if (language) {
             console.log(`Found language: ${language.codename} -> ${language.id}`);
-            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/workflow-steps/${workflowStepId}`);
             
-            const response = await this.managementApi.put(
-              `/items/${itemId}/variants/${language.id}/workflow-steps/${workflowStepId}`
-            );
-            console.log(`Successfully changed workflow step with resolved language ID: ${language.id}`);
-            console.log('Workflow change response:', response.status, response.data);
+            // Get the current variant with the resolved language ID
+            const currentVariant = await this.getContentItem(itemId, language.id);
+            console.log('Current variant before workflow change (resolved language):', currentVariant);
+            
+            // Create updated variant data with the new workflow step
+            const updatedVariantData = {
+              ...currentVariant,
+              workflow_step: {
+                id: workflowStepId
+              },
+              workflow: {
+                workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                step_identifier: { id: workflowStepId }
+              }
+            };
+            
+            console.log('Updated variant data for workflow change (resolved language):', updatedVariantData);
+            
+            // Update the variant with the new workflow step
+            await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
+            console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
           } else {
             console.log(`No suitable language found for identifier: ${languageIdentifier}`);
             throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
