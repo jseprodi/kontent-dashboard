@@ -346,7 +346,7 @@ export class ApiService {
   ): Promise<void> {
     try {
       console.log(`Upserting variant for item ${itemId} with language: ${languageCodename}`);
-      console.log('Variant data to upsert:', variantData);
+      console.log('Variant data to upsert:', JSON.stringify(variantData, null, 2));
       
       // Try using the language codename first
       try {
@@ -357,7 +357,7 @@ export class ApiService {
         console.log(`Successfully upserted variant with codename: ${languageCodename}`);
       } catch (error) {
         console.log(`Failed to upsert with codename '${languageCodename}', trying with language ID...`);
-        console.log('Original error:', error);
+        console.log('Original error:', error); if (error && typeof error === 'object' && 'response' in error && error.response) { console.log('API Response Status:', (error as any).response.status); console.log('API Response Data:', (error as any).response.data); }
         
         // If codename fails, try to find the language ID and use that
         try {
@@ -420,7 +420,7 @@ export class ApiService {
         console.log(`Successfully updated contributors with codename: ${languageCodename}`);
       } catch (error) {
         console.log(`Failed to update with codename '${languageCodename}', trying with language ID...`);
-        console.log('Original error:', error);
+        console.log('Original error:', error); if (error && typeof error === 'object' && 'response' in error && error.response) { console.log('API Response Status:', (error as any).response.status); console.log('API Response Data:', (error as any).response.data); }
         
         // If codename fails, try with language ID
         try {
