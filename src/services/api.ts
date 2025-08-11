@@ -494,11 +494,32 @@ export class ApiService {
       
       // Check if the item is published or archived and needs workflow step change
       const currentWorkflowStep = currentVariant.workflow_step;
-      const isPublished = currentWorkflowStep?.codename === 'published';
-      const isArchived = currentWorkflowStep?.codename === 'archived';
-      
       console.log('Current workflow step before check:', currentWorkflowStep);
-      console.log('Is published:', isPublished, 'Is archived:', isArchived);
+      
+      // Get the default workflow to find published and archived step IDs
+      let isPublished = false;
+      let isArchived = false;
+      
+      if (draftStepId) {
+        try {
+          const workflows = await this.getWorkflows();
+          const defaultWorkflow = workflows.find(w => w.codename === 'default');
+          
+          if (defaultWorkflow) {
+            const publishedStepId = defaultWorkflow.published_step?.id;
+            const archivedStepId = defaultWorkflow.archived_step?.id;
+            
+            isPublished = publishedStepId ? currentWorkflowStep?.id === publishedStepId : false;
+            isArchived = archivedStepId ? currentWorkflowStep?.id === archivedStepId : false;
+            
+            console.log('Published step ID:', publishedStepId);
+            console.log('Archived step ID:', archivedStepId);
+            console.log('Is published:', isPublished, 'Is archived:', isArchived);
+          }
+        } catch (workflowError) {
+          console.warn('Could not determine workflow status, proceeding with current variant:', workflowError);
+        }
+      }
       
       if ((isPublished || isArchived) && draftStepId) {
         console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version and setting to draft...`);
