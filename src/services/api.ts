@@ -277,11 +277,13 @@ export class ApiService {
   /**
    * Get a specific content item with its language variant
    */
-  async getContentItem(itemId: string, languageCodename: string): Promise<any> {
+  async getContentItem(itemId: string, languageIdentifier: string): Promise<any> {
     try {
+      console.log(`Fetching content item ${itemId} with language identifier: ${languageIdentifier}`);
       const response = await this.managementApi.get(
-        `/items/${itemId}/variants/${languageCodename}`
+        `/items/${itemId}/variants/${languageIdentifier}`
       );
+      console.log(`Successfully fetched content item with identifier: ${languageIdentifier}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching content item:', error);
@@ -423,12 +425,12 @@ export class ApiService {
    */
   async assignContributors(
     itemId: string,
-    languageCodename: string,
+    languageIdentifier: string,
     contributorEmails: string[],
     draftStepId?: string
   ): Promise<void> {
     try {
-      console.log(`Assigning contributors to item ${itemId} with language: ${languageCodename}`);
+      console.log(`Assigning contributors to item ${itemId} with language: ${languageIdentifier}`);
       
       // First, try to get the specific language variant
       let currentVariant;
@@ -436,10 +438,10 @@ export class ApiService {
       let languageInfo = null;
       
       try {
-        currentVariant = await this.getContentItem(itemId, languageCodename);
-        console.log(`Found variant for language: ${languageCodename}`);
+        currentVariant = await this.getContentItem(itemId, languageIdentifier);
+        console.log(`Found variant for language: ${languageIdentifier}`);
       } catch (error) {
-        console.log(`Language variant '${languageCodename}' not found, trying to find available variants...`);
+        console.log(`Language variant '${languageIdentifier}' not found, trying to find available variants...`);
         
         // If the specific language doesn't exist, try to get all variants
         try {
@@ -562,7 +564,7 @@ export class ApiService {
           // Create new version and set to draft, and get the new variant data
           const newDraftVariant = await this.createNewVersionAndSetToDraft(
             itemId, 
-            actualLanguageId || languageCodename, 
+            actualLanguageId || languageIdentifier, 
             draftStepId
           );
           console.log('Successfully created new version and set to draft');
@@ -600,7 +602,7 @@ export class ApiService {
       console.log('Final workflow in updated variant:', updatedVariant.workflow);
 
       // Upsert the updated variant using the actual language ID and language info
-      await this.upsertLanguageVariant(itemId, actualLanguageId || languageCodename, updatedVariant, languageInfo);
+      await this.upsertLanguageVariant(itemId, actualLanguageId || languageIdentifier, updatedVariant, languageInfo);
       console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
     } catch (error) {
       console.error('Error assigning contributors:', error);
@@ -822,34 +824,56 @@ export class ApiService {
    */
   async changeWorkflowStep(
     itemId: string,
-    languageCodename: string,
+    languageIdentifier: string,
     workflowStepId: string
   ): Promise<void> {
     try {
       console.log(`Changing workflow step for item ${itemId} to step ${workflowStepId}`);
+      console.log(`Using language identifier: ${languageIdentifier}`);
       
-      // Try using the language codename first
+      // Try using the provided identifier first (could be codename or ID)
       try {
         await this.managementApi.put(
-          `/items/${itemId}/variants/${languageCodename}/workflow`,
+          `/items/${itemId}/variants/${languageIdentifier}/workflow`,
           {
             workflow_step: {
               id: workflowStepId
             }
           }
         );
-        console.log(`Successfully changed workflow step with codename: ${languageCodename}`);
+        console.log(`Successfully changed workflow step with identifier: ${languageIdentifier}`);
       } catch (error) {
-        console.log(`Failed to change workflow step with codename '${languageCodename}', trying with language ID...`);
+        console.log(`Failed to change workflow step with identifier '${languageIdentifier}', trying to resolve language...`);
         console.log('Original error:', error);
         
-        // If codename fails, try with language ID
+        // If the identifier fails, try to resolve it
         try {
           const languages = await this.getLanguages();
-          const language = languages.find(lang => lang.codename === languageCodename);
+          
+          // Check if the identifier is already a language ID
+          let language = languages.find(lang => lang.id === languageIdentifier);
+          
+          // If not found by ID, try to find by codename
+          if (!language) {
+            language = languages.find(lang => lang.codename === languageIdentifier);
+          }
+          
+          // If still not found, try common default language names
+          if (!language) {
+            language = languages.find(lang => 
+              lang.codename === 'default' || 
+              lang.codename === 'en-us' || 
+              lang.codename === 'en'
+            );
+          }
+          
+          // If still not found, use the first available language
+          if (!language && languages.length > 0) {
+            language = languages[0];
+          }
           
           if (language) {
-            console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
+            console.log(`Found language: ${language.codename} -> ${language.id}`);
             console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/workflow`);
             
             await this.managementApi.put(
@@ -860,13 +884,13 @@ export class ApiService {
                 }
               }
             );
-            console.log(`Successfully changed workflow step with language ID: ${language.id}`);
+            console.log(`Successfully changed workflow step with resolved language ID: ${language.id}`);
           } else {
-            console.log(`Language not found for codename: ${languageCodename}`);
-            throw new Error(`Language not found for codename: ${languageCodename}`);
+            console.log(`No suitable language found for identifier: ${languageIdentifier}`);
+            throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
           }
         } catch (languageError) {
-          console.error('Error finding language ID:', languageError);
+          console.error('Error resolving language identifier:', languageError);
           console.error('Language error details:', languageError);
           throw error; // Re-throw the original error
         }
@@ -922,13 +946,13 @@ export class ApiService {
           }
           
           if (language) {
-            // Use the language codename for API calls, not the ID
-            successfulLanguageId = language.codename;
-            console.log(`Found language: ${language.codename} -> ${language.id}, using codename: ${successfulLanguageId}`);
+            // Use the language ID for API calls, as the Management API v2 expects IDs
+            successfulLanguageId = language.id;
+            console.log(`Found language: ${language.codename} -> ${language.id}, using ID: ${successfulLanguageId}`);
             await this.managementApi.post(
-              `/items/${itemId}/variants/${language.codename}/new-version`
+              `/items/${itemId}/variants/${language.id}/new-version`
             );
-            console.log('New version created successfully with resolved language codename');
+            console.log('New version created successfully with resolved language ID');
           } else {
             throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
           }
