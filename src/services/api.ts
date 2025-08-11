@@ -930,46 +930,75 @@ export class ApiService {
             await this.upsertLanguageVariant(itemId, languageIdentifier, newVersionData, currentVariant.language);
             console.log(`Successfully created new version with workflow step ${workflowStepId} for item ${itemId} (fallback method)`);
             
-          } catch (fallbackError) {
-            console.error('Failed to create new version using fallback method:', fallbackError);
-            
-            // If even the fallback fails, try to unpublish first
-            if (isPublished) {
-              console.log('Trying to unpublish item first...');
-              try {
-                await this.managementApi.put(
-                  `/items/${itemId}/variants/${languageIdentifier}/unpublish`
-                );
-                console.log(`Successfully unpublished item ${itemId}`);
-                
-                // Now try to update the workflow step
-                const updatedVariantData = {
-                  ...currentVariant,
-                  workflow_step: {
-                    id: workflowStepId
-                  },
-                  workflow: {
-                    workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                    step_identifier: { id: workflowStepId }
-                  }
-                };
-                
-                delete updatedVariantData.id;
-                delete updatedVariantData.last_modified;
-                delete updatedVariantData.version;
-                
-                await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
-                console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} after unpublishing`);
-                
-                             } catch (unpublishError) {
-                 console.error('Failed to unpublish item:', unpublishError);
-                 const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
-                 throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
+                       } catch (fallbackError) {
+               console.error('Failed to create new version using fallback method:', fallbackError);
+               
+               // If even the fallback fails, try to unpublish first for published items
+               if (isPublished) {
+                 console.log('Trying to unpublish item first...');
+                 try {
+                   await this.managementApi.put(
+                     `/items/${itemId}/variants/${languageIdentifier}/unpublish`
+                   );
+                   console.log(`Successfully unpublished item ${itemId}`);
+                   
+                   // Now try to update the workflow step
+                   const updatedVariantData = {
+                     ...currentVariant,
+                     workflow_step: {
+                       id: workflowStepId
+                     },
+                     workflow: {
+                       workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                       step_identifier: { id: workflowStepId }
+                     }
+                   };
+                   
+                   delete updatedVariantData.id;
+                   delete updatedVariantData.last_modified;
+                   delete updatedVariantData.version;
+                   
+                   await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
+                   console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} after unpublishing`);
+                   
+                 } catch (unpublishError) {
+                   console.error('Failed to unpublish item:', unpublishError);
+                   const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
+                   throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
+                 }
+               } else if (isArchived) {
+                 // For archived items, try to unarchive first
+                 console.log('Trying to unarchive item first...');
+                 try {
+                   // Try to change the workflow step directly to unarchive it
+                   const unarchiveVariantData = {
+                     ...currentVariant,
+                     workflow_step: {
+                       id: workflowStepId
+                     },
+                     workflow: {
+                       workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                       step_identifier: { id: workflowStepId }
+                     }
+                   };
+                   
+                   delete unarchiveVariantData.id;
+                   delete unarchiveVariantData.last_modified;
+                   delete unarchiveVariantData.version;
+                   
+                   // Try to update the archived variant directly
+                   await this.upsertLanguageVariant(itemId, languageIdentifier, unarchiveVariantData, currentVariant.language);
+                   console.log(`Successfully unarchived and updated workflow step to ${workflowStepId} for item ${itemId}`);
+                   
+                 } catch (unarchiveError) {
+                   console.error('Failed to unarchive item:', unarchiveError);
+                   const errorMessage = unarchiveError instanceof Error ? unarchiveError.message : String(unarchiveError);
+                   throw new Error(`Cannot modify archived content item. Failed to unarchive: ${errorMessage}`);
+                 }
+               } else {
+                 const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+                 throw new Error(`Cannot modify content item: ${errorMessage}`);
                }
-             } else {
-               const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-               throw new Error(`Cannot modify archived content item: ${errorMessage}`);
-             }
           }
         } else {
           // For draft items, we can update the variant directly
@@ -1065,46 +1094,75 @@ export class ApiService {
                 await this.upsertLanguageVariant(itemId, language.id, newVersionData, currentVariant.language);
                 console.log(`Successfully created new version with workflow step ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id} (fallback method)`);
                 
-              } catch (fallbackError) {
-                console.error('Failed to create new version using fallback method (resolved language):', fallbackError);
-                
-                // If even the fallback fails, try to unpublish first
-                if (isPublished) {
-                  console.log('Trying to unpublish item first (resolved language)...');
-                  try {
-                    await this.managementApi.put(
-                      `/items/${itemId}/variants/${language.id}/unpublish`
-                    );
-                    console.log(`Successfully unpublished item ${itemId} with resolved language ID: ${language.id}`);
-                    
-                    // Now try to update the workflow step
-                    const updatedVariantData = {
-                      ...currentVariant,
-                      workflow_step: {
-                        id: workflowStepId
-                      },
-                      workflow: {
-                        workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                        step_identifier: { id: workflowStepId }
-                      }
-                    };
-                    
-                    delete updatedVariantData.id;
-                    delete updatedVariantData.last_modified;
-                    delete updatedVariantData.version;
-                    
-                    await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
-                    console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id} after unpublishing`);
-                    
-                  } catch (unpublishError) {
-                    console.error('Failed to unpublish item (resolved language):', unpublishError);
-                    const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
-                    throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
-                  }
-                } else {
-                  const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-                  throw new Error(`Cannot modify archived content item: ${errorMessage}`);
-                }
+                             } catch (fallbackError) {
+                 console.error('Failed to create new version using fallback method (resolved language):', fallbackError);
+                 
+                 // If even the fallback fails, try to unpublish first for published items
+                 if (isPublished) {
+                   console.log('Trying to unpublish item first (resolved language)...');
+                   try {
+                     await this.managementApi.put(
+                       `/items/${itemId}/variants/${language.id}/unpublish`
+                     );
+                     console.log(`Successfully unpublished item ${itemId} with resolved language ID: ${language.id}`);
+                     
+                     // Now try to update the workflow step
+                     const updatedVariantData = {
+                       ...currentVariant,
+                       workflow_step: {
+                         id: workflowStepId
+                       },
+                       workflow: {
+                         workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                         step_identifier: { id: workflowStepId }
+                       }
+                     };
+                     
+                     delete updatedVariantData.id;
+                     delete updatedVariantData.last_modified;
+                     delete updatedVariantData.version;
+                     
+                     await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
+                     console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id} after unpublishing`);
+                     
+                   } catch (unpublishError) {
+                     console.error('Failed to unpublish item (resolved language):', unpublishError);
+                     const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
+                     throw new Error(`Cannot modify published/archived content item. Failed to unpublish: ${errorMessage}`);
+                   }
+                 } else if (isArchived) {
+                   // For archived items, try to unarchive first
+                   console.log('Trying to unarchive item first (resolved language)...');
+                   try {
+                     // Try to change the workflow step directly to unarchive it
+                     const unarchiveVariantData = {
+                       ...currentVariant,
+                       workflow_step: {
+                         id: workflowStepId
+                       },
+                       workflow: {
+                         workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                         step_identifier: { id: workflowStepId }
+                       }
+                     };
+                     
+                     delete unarchiveVariantData.id;
+                     delete unarchiveVariantData.last_modified;
+                     delete unarchiveVariantData.version;
+                     
+                     // Try to update the archived variant directly
+                     await this.upsertLanguageVariant(itemId, language.id, unarchiveVariantData, currentVariant.language);
+                     console.log(`Successfully unarchived and updated workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
+                     
+                   } catch (unarchiveError) {
+                     console.error('Failed to unarchive item (resolved language):', unarchiveError);
+                     const errorMessage = unarchiveError instanceof Error ? unarchiveError.message : String(unarchiveError);
+                     throw new Error(`Cannot modify archived content item. Failed to unarchive: ${errorMessage}`);
+                   }
+                 } else {
+                   const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+                   throw new Error(`Cannot modify content item: ${errorMessage}`);
+                 }
               }
             } else {
               // For draft items, update variant directly
