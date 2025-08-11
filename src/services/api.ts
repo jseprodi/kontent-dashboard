@@ -463,23 +463,23 @@ export class ApiService {
                 
                 const language = languages.find(lang => lang.id === languageId);
                 if (language) {
-                  // Use the language codename for API calls, not the ID
-                  actualLanguageId = language.codename;
+                  // Use the language ID for API calls, as the Management API v2 expects IDs
+                  actualLanguageId = language.id;
                   languageInfo = language; // Store the language info
-                  console.log(`Found language: ${language.codename} -> ${language.id}, using codename: ${actualLanguageId}`);
+                  console.log(`Found language: ${language.codename} -> ${language.id}, using ID: ${actualLanguageId}`);
                 } else {
                   console.log(`Language with ID ${languageId} not found in languages list, trying to find default language...`);
                   // Fall back to finding a default language
                   const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
-                  if (defaultLanguage) {
-                    actualLanguageId = defaultLanguage.codename;
-                    languageInfo = defaultLanguage;
-                    console.log(`Using default language: ${defaultLanguage.codename}`);
-                  } else if (languages.length > 0) {
-                    actualLanguageId = languages[0].codename;
-                    languageInfo = languages[0];
-                    console.log(`Using first available language: ${languages[0].codename}`);
-                  } else {
+                                     if (defaultLanguage) {
+                     actualLanguageId = defaultLanguage.id;
+                     languageInfo = defaultLanguage;
+                     console.log(`Using default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
+                   } else if (languages.length > 0) {
+                     actualLanguageId = languages[0].id;
+                     languageInfo = languages[0];
+                     console.log(`Using first available language: ${languages[0].codename} -> ${languages[0].id}`);
+                   } else {
                     throw new Error('No languages available in the project');
                   }
                 }
@@ -493,18 +493,18 @@ export class ApiService {
               try {
                 const languages = await this.getLanguages();
                 const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
-                if (defaultLanguage) {
-                  actualLanguageId = defaultLanguage.codename;
-                  languageInfo = defaultLanguage;
-                  console.log(`Found default language: ${defaultLanguage.codename}`);
-                } else {
-                  // If no default language found, use the first available language
-                  const firstLanguage = languages[0];
-                  if (firstLanguage) {
-                    actualLanguageId = firstLanguage.codename;
-                    languageInfo = firstLanguage;
-                    console.log(`Using first available language: ${firstLanguage.codename}`);
-                  } else {
+                                 if (defaultLanguage) {
+                   actualLanguageId = defaultLanguage.id;
+                   languageInfo = defaultLanguage;
+                   console.log(`Found default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
+                 } else {
+                   // If no default language found, use the first available language
+                   const firstLanguage = languages[0];
+                   if (firstLanguage) {
+                     actualLanguageId = firstLanguage.id;
+                     languageInfo = firstLanguage;
+                     console.log(`Using first available language: ${firstLanguage.codename} -> ${firstLanguage.id}`);
+                   } else {
                     throw new Error('No languages available in the project');
                   }
                 }
