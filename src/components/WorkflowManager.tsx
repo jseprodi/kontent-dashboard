@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ApiService } from '../services/api';
 import { Workflow } from '../types';
-import { Settings, Play, Edit, Trash2, Plus, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 
 interface WorkflowManagerProps {
   apiService: ApiService;

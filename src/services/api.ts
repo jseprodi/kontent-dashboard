@@ -866,9 +866,8 @@ export class ApiService {
       console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
       
       // First, create a new version
-      let newVersionResponse;
       try {
-        newVersionResponse = await this.managementApi.post(
+        await this.managementApi.post(
           `/items/${itemId}/variants/${languageCodename}/new-version`
         );
         console.log('New version created successfully');
@@ -880,7 +879,7 @@ export class ApiService {
         const language = languages.find(lang => lang.codename === languageCodename);
         
         if (language) {
-          newVersionResponse = await this.managementApi.post(
+          await this.managementApi.post(
             `/items/${itemId}/variants/${language.id}/new-version`
           );
           console.log('New version created successfully with language ID');

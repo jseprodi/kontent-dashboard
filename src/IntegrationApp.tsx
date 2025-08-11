@@ -138,8 +138,8 @@ export function IntegrationApp() {
 
           {/* Tab Content */}
           <div className="tab-content">
-            {activeTab === 'bulk-assignment' && (
-              <BulkAssignmentDashboard />
+            {activeTab === 'bulk-assignment' && apiService && (
+              <BulkAssignmentDashboard apiService={apiService} />
             )}
             {activeTab === 'workflow' && apiService && (
               <WorkflowManager apiService={apiService} />
