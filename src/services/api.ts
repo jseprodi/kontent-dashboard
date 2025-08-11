@@ -467,7 +467,7 @@ export class ApiService {
       
       // First, try to get the specific language variant
       let currentVariant;
-      let actualLanguageCodename = languageCodename;
+      let actualLanguageId = null;
       let languageInfo = null;
       
       try {
@@ -496,25 +496,25 @@ export class ApiService {
                 
                 const language = languages.find(lang => lang.id === languageId);
                 if (language) {
-                  actualLanguageCodename = language.codename;
+                  actualLanguageId = language.id;
                   languageInfo = language; // Store the language info
-                  console.log(`Found language codename: ${actualLanguageCodename} for ID: ${languageId}`);
+                  console.log(`Found language ID: ${actualLanguageId} for codename: ${languageId}`);
                 } else {
                   console.log(`Language with ID ${languageId} not found in languages list, using ID as codename`);
-                  actualLanguageCodename = languageId;
+                  actualLanguageId = languageId;
                 }
               } catch (languagesError) {
                 console.error('Error getting languages:', languagesError);
                 console.log(`Using language ID ${languageId} as codename`);
-                actualLanguageCodename = languageId;
+                actualLanguageId = languageId;
               }
             } else {
               console.log('No language ID found in variant, using default');
-              actualLanguageCodename = 'default';
+              actualLanguageId = '00000000-0000-0000-0000-000000000000';
             }
             
             // Use the variant data we already have instead of fetching it again
-            console.log(`Using existing variant data with language: ${actualLanguageCodename}`);
+            console.log(`Using existing variant data with language ID: ${actualLanguageId}`);
             currentVariant = firstVariant;
           } else {
             throw new Error('No language variants found for this content item');
@@ -530,7 +530,7 @@ export class ApiService {
       // Try the simpler approach first - update just the contributors field
       try {
         console.log('Trying simple contributors update...');
-        await this.updateContributors(itemId, actualLanguageCodename, contributorEmails);
+        await this.updateContributors(itemId, actualLanguageId || languageCodename, contributorEmails);
         console.log(`Successfully assigned contributors using simple update for item ${itemId}`);
         return; // Exit early if successful
       } catch (simpleError) {
@@ -549,8 +549,8 @@ export class ApiService {
 
         console.log('Updated variant:', updatedVariant);
 
-        // Upsert the updated variant using the actual language codename and language info
-        await this.upsertLanguageVariant(itemId, actualLanguageCodename, updatedVariant, languageInfo);
+        // Upsert the updated variant using the actual language ID and language info
+        await this.upsertLanguageVariant(itemId, actualLanguageId || languageCodename, updatedVariant, languageInfo);
         console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
       }
     } catch (error) {
