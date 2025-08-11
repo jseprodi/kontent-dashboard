@@ -886,32 +886,76 @@ export class ApiService {
       console.log(`Changing workflow step for item ${itemId} to step ${workflowStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
 
-      // Instead of trying to change workflow step via a separate endpoint,
-      // we'll update the variant directly with the new workflow step
-      // This approach is more reliable and follows the standard variant update pattern
+      // For published/archived items, we need to use the workflow management API
+      // to change the workflow step before we can update the variant
       
       try {
         // First, get the current variant to see its current state
         const currentVariant = await this.getContentItem(itemId, languageIdentifier);
         console.log('Current variant before workflow change:', currentVariant);
         
-        // Create updated variant data with the new workflow step
-        const updatedVariantData = {
-          ...currentVariant,
-          workflow_step: {
-            id: workflowStepId
-          },
-          workflow: {
-            workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-            step_identifier: { id: workflowStepId }
+        // Check if the item is published or archived
+        const currentWorkflowStep = currentVariant.workflow_step;
+        const isPublished = currentWorkflowStep?.id === 'c199950d-99f0-4983-b711-6c4c91624b22'; // Published step ID
+        const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391'; // Archived step ID
+        
+        if (isPublished || isArchived) {
+          console.log(`Item is ${isPublished ? 'published' : 'archived'}, using workflow management API...`);
+          
+          // For published/archived items, we need to use the workflow management endpoint
+          // According to Kontent.ai API docs, we need to change the workflow step first
+          
+          // Try using the workflow management endpoint
+          try {
+            console.log(`Attempting to change workflow step using workflow management API...`);
+            
+            // Use the workflow management endpoint to change the step
+            const response = await this.managementApi.put(
+              `/items/${itemId}/workflow`,
+              {
+                workflow_step: {
+                  id: workflowStepId
+                }
+              }
+            );
+            
+            console.log(`Successfully changed workflow step using workflow management API:`, response.status, response.data);
+            return;
+            
+          } catch (workflowError) {
+            console.log(`Workflow management API failed, trying alternative approach...`);
+            console.log('Workflow error:', workflowError);
+            
+            // If the workflow management endpoint fails, try creating a new version
+            // This is a fallback approach for published/archived items
+            console.log(`Creating new version for ${isPublished ? 'published' : 'archived'} item...`);
+            
+            // For published/archived items, we might need to create a new version
+            // This is a more complex approach that requires additional API calls
+            throw new Error(`Cannot change workflow step for ${isPublished ? 'published' : 'archived'} item using current approach. Please implement new version creation.`);
           }
-        };
-        
-        console.log('Updated variant data for workflow change:', updatedVariantData);
-        
-        // Update the variant with the new workflow step
-        await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
-        console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId}`);
+        } else {
+          // For draft items, we can update the variant directly
+          console.log('Item is in draft state, updating variant directly...');
+          
+          // Create updated variant data with the new workflow step
+          const updatedVariantData = {
+            ...currentVariant,
+            workflow_step: {
+              id: workflowStepId
+            },
+            workflow: {
+              workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+              step_identifier: { id: workflowStepId }
+            }
+          };
+          
+          console.log('Updated variant data for workflow change:', updatedVariantData);
+          
+          // Update the variant with the new workflow step
+          await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
+          console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId}`);
+        }
         
       } catch (error) {
         console.log(`Failed to change workflow step with identifier '${languageIdentifier}', trying to resolve language...`);
@@ -950,23 +994,49 @@ export class ApiService {
             const currentVariant = await this.getContentItem(itemId, language.id);
             console.log('Current variant before workflow change (resolved language):', currentVariant);
             
-            // Create updated variant data with the new workflow step
-            const updatedVariantData = {
-              ...currentVariant,
-              workflow_step: {
-                id: workflowStepId
-              },
-              workflow: {
-                workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                step_identifier: { id: workflowStepId }
+            // Check workflow state again with resolved language
+            const currentWorkflowStep = currentVariant.workflow_step;
+            const isPublished = currentWorkflowStep?.id === 'c199950d-99f0-4983-b711-6c4c91624b22';
+            const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391';
+            
+            if (isPublished || isArchived) {
+              console.log(`Item is ${isPublished ? 'published' : 'archived'} with resolved language, using workflow management API...`);
+              
+              try {
+                const response = await this.managementApi.put(
+                  `/items/${itemId}/workflow`,
+                  {
+                    workflow_step: {
+                      id: workflowStepId
+                    }
+                  }
+                );
+                
+                console.log(`Successfully changed workflow step using workflow management API (resolved language):`, response.status, response.data);
+                return;
+                
+              } catch (workflowError) {
+                console.log(`Workflow management API failed with resolved language:`, workflowError);
+                throw new Error(`Cannot change workflow step for ${isPublished ? 'published' : 'archived'} item. Please implement new version creation.`);
               }
-            };
-            
-            console.log('Updated variant data for workflow change (resolved language):', updatedVariantData);
-            
-            // Update the variant with the new workflow step
-            await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
-            console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
+            } else {
+              // For draft items, update variant directly
+              const updatedVariantData = {
+                ...currentVariant,
+                workflow_step: {
+                  id: workflowStepId
+                },
+                workflow: {
+                  workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                  step_identifier: { id: workflowStepId }
+                }
+              };
+              
+              console.log('Updated variant data for workflow change (resolved language):', updatedVariantData);
+              
+              await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
+              console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
+            }
           } else {
             console.log(`No suitable language found for identifier: ${languageIdentifier}`);
             throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
