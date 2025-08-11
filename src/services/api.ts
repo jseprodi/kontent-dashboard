@@ -416,78 +416,7 @@ export class ApiService {
     }
   }
 
-  /**
-   * Update just the contributors field for a content item
-   */
-  async updateContributors(
-    itemId: string,
-    languageCodename: string,
-    contributorEmails: string[]
-  ): Promise<void> {
-    try {
-      console.log(`Updating contributors for item ${itemId} with language: ${languageCodename}`);
-      console.log('Contributor emails:', contributorEmails);
-      
-      // Try using the language codename first
-      try {
-        await this.managementApi.put(
-          `/items/${itemId}/variants/${languageCodename}/elements/contributors`,
-          {
-            value: contributorEmails
-          }
-        );
-        console.log(`Successfully updated contributors with codename: ${languageCodename}`);
-      } catch (error) {
-        console.log(`Failed to update with codename '${languageCodename}', trying with language ID...`);
-        console.log('Original error:', error); if (error && typeof error === 'object' && 'response' in error && error.response) { console.log('API Response Status:', (error as any).response.status); console.log('API Response Data:', (error as any).response.data); }
-        
-        // If codename fails, try with language ID
-        try {
-          const languages = await this.getLanguages();
-          const language = languages.find(lang => lang.codename === languageCodename);
-          
-          if (language) {
-            console.log(`Found language ID: ${language.id} for codename: ${languageCodename}`);
-            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/elements/contributors`);
-            
-            await this.managementApi.put(
-              `/items/${itemId}/variants/${language.id}/elements/contributors`,
-              {
-                value: contributorEmails
-              }
-            );
-            console.log(`Successfully updated contributors with language ID: ${language.id}`);
-          } else {
-            console.log(`Language not found for codename: ${languageCodename}`);
-            throw new Error(`Language not found for codename: ${languageCodename}`);
-          }
-        } catch (languageError) {
-          console.error('Error finding language ID:', languageError);
-          console.error('Language error details:', languageError);
-          
-          // Check if this is a published variant error
-          if (error && typeof error === 'object' && 'response' in error && 
-              (error as any).response?.status === 400 && 
-              (error as any).response?.data?.message?.includes('published and cannot be updated')) {
-            throw new Error('Cannot update published content item. Please create a new version first.');
-          }
-          
-          throw error; // Re-throw the original error
-        }
-      }
-    } catch (error) {
-      console.error('Error updating contributors:', error);
-      
-      // Check if this is a published variant error
-      if (error && typeof error === 'object' && 'response' in error && 
-          (error as any).response?.status === 400 && 
-          (error as any).response?.data?.message?.includes('published and cannot be updated')) {
-        throw new Error('Cannot update published content item. Please create a new version first.');
-      }
-      
-      throw new Error('Failed to update contributors');
-    }
-  }
+
 
   /**
    * Assign contributors to a content item
@@ -579,68 +508,38 @@ export class ApiService {
             draftStepId
           );
           console.log('Successfully created new version and set to draft');
+          
+          // After creating a new version, we need to fetch the new variant data
+          // because the old currentVariant still has the old workflow step info
+          try {
+            currentVariant = await this.getContentItem(itemId, actualLanguageId || languageCodename);
+            console.log('Fetched new variant data after creating new version:', currentVariant);
+          } catch (fetchError) {
+            console.log('Could not fetch new variant data, will try to proceed with existing data');
+          }
         } catch (workflowError) {
           console.error('Failed to create new version and set to draft:', workflowError);
-          // Continue with contributor assignment even if workflow change fails
+          throw new Error('Failed to create new version for published/archived content item'); // Re-throw to stop assignment
         }
       }
       
-      // Try the simpler approach first - update just the contributors field
-      try {
-        console.log('Trying simple contributors update...');
-        await this.updateContributors(itemId, actualLanguageId || languageCodename, contributorEmails);
-        console.log(`Successfully assigned contributors using simple update for item ${itemId}`);
-        return; // Exit early if successful
-      } catch (simpleError: any) {
-        console.log('Simple update failed, checking if it\'s a published variant error...');
-        console.log('Simple error:', simpleError);
-        
-        // Check if this is a published variant error that requires a new version
-        if (simpleError.response?.status === 400 && 
-            simpleError.response?.data?.message?.includes('published and cannot be updated')) {
-          console.log('Detected published variant error, creating new version...');
-          
-          if (draftStepId) {
-            try {
-              // Create new version and set to draft
-              await this.createNewVersionAndSetToDraft(
-                itemId, 
-                actualLanguageId || languageCodename, 
-                draftStepId
-              );
-              console.log('Successfully created new version and set to draft');
-              
-              // Now try to update contributors on the new version
-              await this.updateContributors(itemId, actualLanguageId || languageCodename, contributorEmails);
-              console.log('Successfully assigned contributors to new version');
-              return;
-            } catch (workflowError) {
-              console.error('Failed to create new version and set to draft:', workflowError);
-              throw new Error('Failed to create new version for published content item');
-            }
-          } else {
-            throw new Error('Cannot update published content item. Please provide a draft step ID to create a new version.');
-          }
-        }
-        
-        // If it's not a published variant error, try the full variant upsert
-        console.log('Trying full variant upsert...');
-        
-        // Convert elements object to array format that the API expects
-        const elementsArray = Object.values(currentVariant.elements || {});
-        console.log('Elements array:', elementsArray);
-        
-        const updatedVariant = {
-          ...currentVariant,
-          elements: elementsArray,
-        };
+      // Prepare the variant data for upsert, including updated contributors
+      // Convert elements object to array format that the API expects
+      const elementsArray = Object.values(currentVariant.elements || {});
+      console.log('Elements array before updating contributors:', elementsArray);
+      
+      const updatedVariant = {
+        ...currentVariant,
+        elements: elementsArray,
+        // Explicitly set the contributors field
+        contributors: contributorEmails.map(email => ({ id: email })), // Kontent.ai expects an array of objects with 'id'
+      };
 
-        console.log('Updated variant:', updatedVariant);
+      console.log('Updated variant data for upsert:', updatedVariant);
 
-        // Upsert the updated variant using the actual language ID and language info
-        await this.upsertLanguageVariant(itemId, actualLanguageId || languageCodename, updatedVariant, languageInfo);
-        console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
-      }
+      // Upsert the updated variant using the actual language ID and language info
+      await this.upsertLanguageVariant(itemId, actualLanguageId || languageCodename, updatedVariant, languageInfo);
+      console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
     } catch (error) {
       console.error('Error assigning contributors:', error);
       throw new Error('Failed to assign contributors');
