@@ -896,7 +896,7 @@ export class ApiService {
   }
 
   /**
-   * Create a new version of a content item and set it to draft workflow step
+   * Create a new draft variant for a published/archived content item
    * Returns the new variant data for further use
    */
   async createNewVersionAndSetToDraft(
@@ -905,11 +905,10 @@ export class ApiService {
     draftStepId: string
   ): Promise<any> {
     try {
-      console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
+      console.log(`Creating new draft variant for item ${itemId} and setting to draft step ${draftStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
       
-      // For the /new-version endpoint, we need to use the language codename, not the ID
-      // The Kontent.ai Management API v2 expects codenames like "default", not GUIDs
+      // For the Management API v2, we need to use the language codename, not the ID
       let languageCodename = languageIdentifier;
       
       // If we have a language ID (GUID), we need to find the corresponding codename
@@ -929,36 +928,51 @@ export class ApiService {
         }
       }
       
-      console.log(`Using language codename for new-version API: ${languageCodename}`);
+      console.log(`Using language codename: ${languageCodename}`);
       
-      // Create new version using the language codename
+      // Instead of trying to create a "new version" (which doesn't exist in Management API v2),
+      // we'll create a new variant by copying the existing one and setting it to draft
       try {
-        await this.managementApi.post(
-          `/items/${itemId}/variants/${languageCodename}/new-version`
-        );
-        console.log('New version created successfully');
+        // First, get the current variant to copy its data
+        const currentVariant = await this.getContentItem(itemId, languageCodename);
+        console.log('Retrieved current variant for copying:', currentVariant);
+        
+        // Create a new variant by copying the existing one
+        // The Management API v2 allows us to create variants by providing the full variant data
+        const newVariantData = {
+          ...currentVariant,
+          // Remove any fields that shouldn't be copied
+          id: undefined,
+          last_modified: undefined,
+          // Set the workflow step to draft
+          workflow_step: {
+            id: draftStepId
+          }
+        };
+        
+        console.log('Creating new variant with draft workflow step...');
+        
+        // Create the new variant by upserting with the draft workflow step
+        await this.upsertLanguageVariant(itemId, languageCodename, newVariantData);
+        console.log('New draft variant created successfully');
+        
+        // Get the updated variant data to return
+        console.log('Fetching updated variant data...');
+        const newVariant = await this.getContentItem(itemId, languageCodename);
+        console.log('Retrieved new variant data after creation:', newVariant);
+        console.log('New variant workflow step:', newVariant.workflow_step);
+        console.log('New variant workflow:', newVariant.workflow);
+        
+        return newVariant;
+        
       } catch (error) {
-        console.error(`Failed to create new version with codename '${languageCodename}':`, error);
-        throw new Error(`Failed to create new version: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error(`Failed to create new draft variant:`, error);
+        throw new Error(`Failed to create new draft variant: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
       
-      // Then change the workflow step to draft
-      console.log('Changing workflow step to draft...');
-      await this.changeWorkflowStep(itemId, languageCodename, draftStepId);
-      console.log('Workflow step changed to draft successfully');
-      
-      // Get the updated variant data to return
-      console.log('Fetching updated variant data...');
-      const newVariant = await this.getContentItem(itemId, languageCodename);
-      console.log('Retrieved new variant data after workflow change:', newVariant);
-      console.log('New variant workflow step:', newVariant.workflow_step);
-      console.log('New variant workflow:', newVariant.workflow);
-      
-      return newVariant;
-      
     } catch (error) {
-      console.error('Error creating new version and setting to draft:', error);
-      throw new Error('Failed to create new version and set to draft');
+      console.error('Error creating new draft variant and setting to draft:', error);
+      throw new Error('Failed to create new draft variant and set to draft');
     }
   }
 
