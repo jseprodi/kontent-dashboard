@@ -888,14 +888,9 @@ export class ApiService {
       
       // Try using the provided identifier first (could be codename or ID)
       try {
-        console.log(`Attempting PUT to: /items/${itemId}/variants/${languageIdentifier}/workflow`);
+        console.log(`Attempting PUT to: /items/${itemId}/variants/${languageIdentifier}/workflow-steps/${workflowStepId}`);
         const response = await this.managementApi.put(
-          `/items/${itemId}/variants/${languageIdentifier}/workflow`,
-          {
-            workflow_step: {
-              id: workflowStepId
-            }
-          }
+          `/items/${itemId}/variants/${languageIdentifier}/workflow-steps/${workflowStepId}`
         );
         console.log(`Successfully changed workflow step with identifier: ${languageIdentifier}`);
         console.log('Workflow change response:', response.status, response.data);
@@ -931,15 +926,10 @@ export class ApiService {
           
           if (language) {
             console.log(`Found language: ${language.codename} -> ${language.id}`);
-            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/workflow`);
+            console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/workflow-steps/${workflowStepId}`);
             
             const response = await this.managementApi.put(
-              `/items/${itemId}/variants/${language.id}/workflow`,
-              {
-                workflow_step: {
-                  id: workflowStepId
-                }
-              }
+              `/items/${itemId}/variants/${language.id}/workflow-steps/${workflowStepId}`
             );
             console.log(`Successfully changed workflow step with resolved language ID: ${language.id}`);
             console.log('Workflow change response:', response.status, response.data);
