@@ -908,27 +908,48 @@ export class ApiService {
       console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
       
-      // First, try to create a new version with the provided identifier
-      let successfulLanguageId = languageIdentifier;
+      // For the /new-version endpoint, we need to use the language codename, not the ID
+      // The Kontent.ai Management API v2 expects codenames like "default", not GUIDs
+      let languageCodename = languageIdentifier;
       
+      // If we have a language ID (GUID), we need to find the corresponding codename
+      if (languageIdentifier.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.log('Language identifier is a GUID, finding corresponding codename...');
+        try {
+          const languages = await this.getLanguages();
+          const language = languages.find(lang => lang.id === languageIdentifier);
+          if (language) {
+            languageCodename = language.codename;
+            console.log(`Found language codename: ${languageCodename} for ID: ${languageIdentifier}`);
+          } else {
+            console.warn(`Language with ID ${languageIdentifier} not found, using ID as fallback`);
+          }
+        } catch (error) {
+          console.warn('Could not resolve language ID to codename, using ID as fallback:', error);
+        }
+      }
+      
+      console.log(`Using language codename for new-version API: ${languageCodename}`);
+      
+      // Create new version using the language codename
       try {
         await this.managementApi.post(
-          `/items/${itemId}/variants/${languageIdentifier}/new-version`
+          `/items/${itemId}/variants/${languageCodename}/new-version`
         );
         console.log('New version created successfully');
       } catch (error) {
-        console.error(`Failed to create new version with identifier '${languageIdentifier}':`, error);
+        console.error(`Failed to create new version with codename '${languageCodename}':`, error);
         throw new Error(`Failed to create new version: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
       
       // Then change the workflow step to draft
       console.log('Changing workflow step to draft...');
-      await this.changeWorkflowStep(itemId, successfulLanguageId, draftStepId);
+      await this.changeWorkflowStep(itemId, languageCodename, draftStepId);
       console.log('Workflow step changed to draft successfully');
       
       // Get the updated variant data to return
       console.log('Fetching updated variant data...');
-      const newVariant = await this.getContentItem(itemId, successfulLanguageId);
+      const newVariant = await this.getContentItem(itemId, languageCodename);
       console.log('Retrieved new variant data after workflow change:', newVariant);
       console.log('New variant workflow step:', newVariant.workflow_step);
       console.log('New variant workflow:', newVariant.workflow);
