@@ -501,27 +501,24 @@ export class ApiService {
         console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version and setting to draft...`);
         
         try {
-          // Create new version and set to draft
-          await this.createNewVersionAndSetToDraft(
+          // Create new version and set to draft, and get the new variant data
+          const newDraftVariant = await this.createNewVersionAndSetToDraft(
             itemId, 
             actualLanguageId || languageCodename, 
             draftStepId
           );
           console.log('Successfully created new version and set to draft');
-          
-          // After creating a new version, we need to fetch the new variant data
-          // because the old currentVariant still has the old workflow step info
-          try {
-            currentVariant = await this.getContentItem(itemId, actualLanguageId || languageCodename);
-            console.log('Fetched new variant data after creating new version:', currentVariant);
-          } catch (fetchError) {
-            console.log('Could not fetch new variant data, will try to proceed with existing data');
-          }
+          currentVariant = newDraftVariant; // Update currentVariant to the new draft version
+          console.log('Updated current variant to new draft version:', currentVariant);
         } catch (workflowError) {
           console.error('Failed to create new version and set to draft:', workflowError);
           throw new Error('Failed to create new version for published/archived content item'); // Re-throw to stop assignment
         }
       }
+      
+      // Resolve email addresses to user IDs
+      const emailToUserIdMap = await this.resolveEmailsToUserIds(contributorEmails);
+      const contributorUserIds = contributorEmails.map(email => emailToUserIdMap[email]);
       
       // Prepare the variant data for upsert, including updated contributors
       // Convert elements object to array format that the API expects
@@ -531,8 +528,8 @@ export class ApiService {
       const updatedVariant = {
         ...currentVariant,
         elements: elementsArray,
-        // Explicitly set the contributors field
-        contributors: contributorEmails.map(email => ({ id: email })), // Kontent.ai expects an array of objects with 'id'
+        // Explicitly set the contributors field with resolved user IDs
+        contributors: contributorUserIds.map(userId => ({ id: userId })),
       };
 
       console.log('Updated variant data for upsert:', updatedVariant);
@@ -816,13 +813,14 @@ export class ApiService {
   }
 
   /**
-   * Create a new version of a content item and change its workflow step to draft
+   * Create a new version of a content item and set it to draft workflow step
+   * Returns the new variant data for further use
    */
   async createNewVersionAndSetToDraft(
     itemId: string,
     languageCodename: string,
     draftStepId: string
-  ): Promise<void> {
+  ): Promise<any> {
     try {
       console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
       
@@ -853,9 +851,50 @@ export class ApiService {
       await this.changeWorkflowStep(itemId, languageCodename, draftStepId);
       console.log('Workflow step changed to draft successfully');
       
+      // Get the updated variant data to return
+      const newVariant = await this.getContentItem(itemId, languageCodename);
+      console.log('Retrieved new variant data after workflow change:', newVariant);
+      
+      return newVariant;
+      
     } catch (error) {
       console.error('Error creating new version and setting to draft:', error);
       throw new Error('Failed to create new version and set to draft');
+    }
+  }
+
+  /**
+   * Resolve email addresses to Kontent.ai user IDs
+   */
+  async resolveEmailsToUserIds(emails: string[]): Promise<{ [email: string]: string }> {
+    try {
+      console.log('Resolving emails to user IDs:', emails);
+      
+      // Get all users from Kontent.ai
+      const users = await this.getUsers();
+      console.log('Retrieved users:', users);
+      
+      const emailToUserIdMap: { [email: string]: string } = {};
+      
+      for (const email of emails) {
+        const user = users.find(u => u.email === email);
+        if (user) {
+          emailToUserIdMap[email] = user.id;
+          console.log(`Resolved email ${email} to user ID: ${user.id}`);
+        } else {
+          console.warn(`User not found for email: ${email}`);
+          // For now, we'll use the email as the ID, but this might cause issues
+          // In a production environment, you might want to throw an error or handle this differently
+          emailToUserIdMap[email] = email;
+        }
+      }
+      
+      console.log('Email to user ID mapping:', emailToUserIdMap);
+      return emailToUserIdMap;
+      
+    } catch (error) {
+      console.error('Error resolving emails to user IDs:', error);
+      throw new Error('Failed to resolve emails to user IDs');
     }
   }
 
