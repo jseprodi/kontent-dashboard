@@ -435,12 +435,21 @@ export class ApiService {
       
       // Check if this is a published variant error
       if (error && typeof error === 'object' && 'response' in error && 
-          (error as any).response?.status === 400 && 
-          (error as any).response?.data?.message?.includes('published and cannot be updated')) {
-        throw new Error('Cannot update published content item. Please create a new version first.');
+          (error as any).response?.status === 400) {
+        const errorMessage = (error as any).response?.data?.message || '';
+        if (errorMessage.includes('published and cannot be updated') || 
+            errorMessage.includes('cannot be updated') ||
+            errorMessage.includes('workflow step')) {
+          throw new Error(`Cannot update content item: ${errorMessage}`);
+        }
       }
       
-      throw new Error('Failed to upsert language variant');
+      // Re-throw the original error with more context
+      if (error instanceof Error) {
+        throw new Error(`Failed to upsert language variant: ${error.message}`);
+      } else {
+        throw new Error('Failed to upsert language variant');
+      }
     }
   }
 
@@ -602,25 +611,24 @@ export class ApiService {
       }
       
       if ((isPublished || isArchived) && draftStepId) {
-        console.log(`Item is ${isPublished ? 'published' : 'archived'}, updating workflow step to draft...`);
+        console.log(`Item is ${isPublished ? 'published' : 'archived'}, changing workflow step to draft first...`);
         
         try {
-          // For published/archived items, we'll update the existing variant to the draft step
-          // This is simpler and more reliable than trying to create a "new version"
-          console.log(`Updating workflow step to draft step: ${draftStepId}`);
+          // For published/archived items, we need to change the workflow step first using the workflow API
+          // This will put the item in a draft state where we can then update contributors
+          console.log(`Changing workflow step to draft step: ${draftStepId}`);
           
-          // Update the current variant's workflow step to draft
-          currentVariant.workflow_step = { id: draftStepId };
-          currentVariant.workflow = {
-            workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-            step_identifier: { id: draftStepId }
-          };
+          // Use the workflow API to change the step first
+          await this.changeWorkflowStep(itemId, actualLanguageId, draftStepId);
+          console.log(`Successfully changed workflow step to draft for item ${itemId}`);
           
-          console.log('Updated current variant workflow step to draft:', currentVariant.workflow_step);
-          console.log('Updated current variant workflow to draft:', currentVariant.workflow);
+          // Now fetch the updated variant to get the current state
+          currentVariant = await this.getContentItem(itemId, actualLanguageId);
+          console.log('Retrieved updated variant after workflow step change:', currentVariant);
+          
         } catch (workflowError) {
-          console.error('Failed to update workflow step to draft:', workflowError);
-          throw new Error('Failed to update workflow step for published/archived content item');
+          console.error('Failed to change workflow step to draft:', workflowError);
+          throw new Error('Failed to change workflow step for published/archived content item');
         }
       }
       
@@ -880,7 +888,8 @@ export class ApiService {
       
       // Try using the provided identifier first (could be codename or ID)
       try {
-        await this.managementApi.put(
+        console.log(`Attempting PUT to: /items/${itemId}/variants/${languageIdentifier}/workflow`);
+        const response = await this.managementApi.put(
           `/items/${itemId}/variants/${languageIdentifier}/workflow`,
           {
             workflow_step: {
@@ -889,6 +898,7 @@ export class ApiService {
           }
         );
         console.log(`Successfully changed workflow step with identifier: ${languageIdentifier}`);
+        console.log('Workflow change response:', response.status, response.data);
       } catch (error) {
         console.log(`Failed to change workflow step with identifier '${languageIdentifier}', trying to resolve language...`);
         console.log('Original error:', error);
@@ -923,7 +933,7 @@ export class ApiService {
             console.log(`Found language: ${language.codename} -> ${language.id}`);
             console.log(`Attempting PUT to: /items/${itemId}/variants/${language.id}/workflow`);
             
-            await this.managementApi.put(
+            const response = await this.managementApi.put(
               `/items/${itemId}/variants/${language.id}/workflow`,
               {
                 workflow_step: {
@@ -932,6 +942,7 @@ export class ApiService {
               }
             );
             console.log(`Successfully changed workflow step with resolved language ID: ${language.id}`);
+            console.log('Workflow change response:', response.status, response.data);
           } else {
             console.log(`No suitable language found for identifier: ${languageIdentifier}`);
             throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
@@ -944,6 +955,15 @@ export class ApiService {
       }
     } catch (error) {
       console.error('Error changing workflow step:', error);
+      
+      // Provide more specific error information
+      if (error && typeof error === 'object' && 'response' in error) {
+        const response = (error as any).response;
+        console.error('Response status:', response.status);
+        console.error('Response data:', response.data);
+        throw new Error(`Failed to change workflow step: ${response.status} - ${response.data?.message || 'Unknown error'}`);
+      }
+      
       throw new Error('Failed to change workflow step');
     }
   }
