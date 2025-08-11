@@ -448,38 +448,81 @@ export class ApiService {
           const variants = await this.getContentItemVariants(itemId);
           console.log('Available variants:', variants);
           
-          if (variants.length > 0) {
-            // Get the first available variant
-            const firstVariant = variants[0];
-            const languageId = firstVariant.language?.id;
-            
-            console.log(`First variant language ID: ${languageId}`);
-            
-            if (languageId) {
-              // Get all languages to find the codename for this ID
+                      if (variants.length > 0) {
+              // Get the first available variant
+              const firstVariant = variants[0];
+              const variantLanguageId = firstVariant.language?.id;
+              
+              console.log(`First variant language ID from API: ${variantLanguageId}`);
+              
+              // Get all languages to find the actual language ID
               try {
                 const languages = await this.getLanguages();
                 console.log('Available languages:', languages);
                 
-                const language = languages.find(lang => lang.id === languageId);
-                if (language) {
-                  // Use the language ID for API calls, as the Management API v2 expects IDs
-                  actualLanguageId = language.id;
-                  languageInfo = language; // Store the language info
-                  console.log(`Found language: ${language.codename} -> ${language.id}, using ID: ${actualLanguageId}`);
+                // Check if the variant language ID is a placeholder GUID
+                const isPlaceholderGuid = variantLanguageId === '00000000-0000-0000-0000-000000000000';
+                
+                if (isPlaceholderGuid) {
+                  console.log('Variant has placeholder GUID, finding actual language...');
+                  // Find the language by codename first (since we're looking for 'default')
+                  let language = languages.find(lang => lang.codename === 'default');
+                  
+                  // If not found by 'default', try common default language names
+                  if (!language) {
+                    language = languages.find(lang => lang.codename === 'en-us' || lang.codename === 'en');
+                  }
+                  
+                  // If still not found, use the first available language
+                  if (!language && languages.length > 0) {
+                    language = languages[0];
+                  }
+                  
+                  if (language) {
+                    actualLanguageId = language.id;
+                    languageInfo = language;
+                    console.log(`Resolved placeholder GUID to language: ${language.codename} -> ${language.id}`);
+                  } else {
+                    throw new Error('No suitable language found for content item variant');
+                  }
+                } else if (variantLanguageId) {
+                  // The variant has a real language ID, verify it exists in our languages list
+                  const language = languages.find(lang => lang.id === variantLanguageId);
+                  if (language) {
+                    actualLanguageId = language.id;
+                    languageInfo = language;
+                    console.log(`Using variant language: ${language.codename} -> ${language.id}`);
+                  } else {
+                    console.log(`Language with ID ${variantLanguageId} not found in languages list, finding default...`);
+                    // Fall back to finding a default language
+                    const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
+                    if (defaultLanguage) {
+                      actualLanguageId = defaultLanguage.id;
+                      languageInfo = defaultLanguage;
+                      console.log(`Using default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
+                    } else if (languages.length > 0) {
+                      actualLanguageId = languages[0].id;
+                      languageInfo = languages[0];
+                      console.log(`Using first available language: ${languages[0].codename} -> ${languages[0].id}`);
+                    } else {
+                      throw new Error('No languages available in the project');
+                    }
+                  }
                 } else {
-                  console.log(`Language with ID ${languageId} not found in languages list, trying to find default language...`);
-                  // Fall back to finding a default language
+                  console.log('No language ID found in variant, finding default language...');
+                  // Try to find a default language
                   const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
-                                     if (defaultLanguage) {
-                     actualLanguageId = defaultLanguage.id;
-                     languageInfo = defaultLanguage;
-                     console.log(`Using default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
-                   } else if (languages.length > 0) {
-                     actualLanguageId = languages[0].id;
-                     languageInfo = languages[0];
-                     console.log(`Using first available language: ${languages[0].codename} -> ${languages[0].id}`);
-                   } else {
+                  if (defaultLanguage) {
+                    actualLanguageId = defaultLanguage.id;
+                    languageInfo = defaultLanguage;
+                    console.log(`Found default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
+                  } else if (languages.length > 0) {
+                    // If no default language found, use the first available language
+                    const firstLanguage = languages[0];
+                    actualLanguageId = firstLanguage.id;
+                    languageInfo = firstLanguage;
+                    console.log(`Using first available language: ${firstLanguage.codename} -> ${firstLanguage.id}`);
+                  } else {
                     throw new Error('No languages available in the project');
                   }
                 }
@@ -487,32 +530,6 @@ export class ApiService {
                 console.error('Error getting languages:', languagesError);
                 throw new Error('Could not determine language for content item variant');
               }
-            } else {
-              console.log('No language ID found in variant, trying to find default language...');
-              // Try to find a default language instead of using placeholder GUID
-              try {
-                const languages = await this.getLanguages();
-                const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
-                                 if (defaultLanguage) {
-                   actualLanguageId = defaultLanguage.id;
-                   languageInfo = defaultLanguage;
-                   console.log(`Found default language: ${defaultLanguage.codename} -> ${defaultLanguage.id}`);
-                 } else {
-                   // If no default language found, use the first available language
-                   const firstLanguage = languages[0];
-                   if (firstLanguage) {
-                     actualLanguageId = firstLanguage.id;
-                     languageInfo = firstLanguage;
-                     console.log(`Using first available language: ${firstLanguage.codename} -> ${firstLanguage.id}`);
-                   } else {
-                    throw new Error('No languages available in the project');
-                  }
-                }
-              } catch (langError) {
-                console.error('Error finding default language:', langError);
-                throw new Error('Could not determine language for content item variant');
-              }
-            }
             
             // Use the variant data we already have instead of fetching it again
             console.log(`Using existing variant data with language ID: ${actualLanguageId}`);
@@ -928,27 +945,51 @@ export class ApiService {
         // If the identifier fails, try to resolve it as a codename to get the ID
         try {
           const languages = await this.getLanguages();
-          // Try to find the language by codename first
-          let language = languages.find(lang => lang.codename === languageIdentifier);
+          console.log('Available languages for resolution:', languages);
           
-          // If not found by codename, try common default language names
-          if (!language) {
-            language = languages.find(lang => 
-              lang.codename === 'default' || 
-              lang.codename === 'en-us' || 
-              lang.codename === 'en'
-            );
-          }
+          // Check if the identifier is a placeholder GUID
+          const isPlaceholderGuid = languageIdentifier === '00000000-0000-0000-0000-000000000000';
           
-          // If still not found, use the first available language
-          if (!language && languages.length > 0) {
-            language = languages[0];
+          let language;
+          if (isPlaceholderGuid) {
+            console.log('Identifier is placeholder GUID, finding actual language...');
+            // Find the language by codename first (since we're looking for 'default')
+            language = languages.find(lang => lang.codename === 'default');
+            
+            // If not found by 'default', try common default language names
+            if (!language) {
+              language = languages.find(lang => lang.codename === 'en-us' || lang.codename === 'en');
+            }
+            
+            // If still not found, use the first available language
+            if (!language && languages.length > 0) {
+              language = languages[0];
+            }
+          } else {
+            // Try to find the language by codename first
+            language = languages.find(lang => lang.codename === languageIdentifier);
+            
+            // If not found by codename, try common default language names
+            if (!language) {
+              language = languages.find(lang => 
+                lang.codename === 'default' || 
+                lang.codename === 'en-us' || 
+                lang.codename === 'en'
+              );
+            }
+            
+            // If still not found, use the first available language
+            if (!language && languages.length > 0) {
+              language = languages[0];
+            }
           }
           
           if (language) {
             // Use the language ID for API calls, as the Management API v2 expects IDs
             successfulLanguageId = language.id;
-            console.log(`Found language: ${language.codename} -> ${language.id}, using ID: ${successfulLanguageId}`);
+            console.log(`Resolved language: ${language.codename} -> ${language.id}, using ID: ${successfulLanguageId}`);
+            
+            // Try to create new version with the resolved language ID
             await this.managementApi.post(
               `/items/${itemId}/variants/${language.id}/new-version`
             );
