@@ -391,11 +391,27 @@ export class ApiService {
         } catch (languageError) {
           console.error('Error finding language ID:', languageError);
           console.error('Language error details:', languageError);
+          
+          // Check if this is a published variant error
+          if (error && typeof error === 'object' && 'response' in error && 
+              (error as any).response?.status === 400 && 
+              (error as any).response?.data?.message?.includes('published and cannot be updated')) {
+            throw new Error('Cannot update published content item. Please create a new version first.');
+          }
+          
           throw error; // Re-throw the original error
         }
       }
     } catch (error) {
       console.error('Error upserting language variant:', error);
+      
+      // Check if this is a published variant error
+      if (error && typeof error === 'object' && 'response' in error && 
+          (error as any).response?.status === 400 && 
+          (error as any).response?.data?.message?.includes('published and cannot be updated')) {
+        throw new Error('Cannot update published content item. Please create a new version first.');
+      }
+      
       throw new Error('Failed to upsert language variant');
     }
   }
@@ -448,11 +464,27 @@ export class ApiService {
         } catch (languageError) {
           console.error('Error finding language ID:', languageError);
           console.error('Language error details:', languageError);
+          
+          // Check if this is a published variant error
+          if (error && typeof error === 'object' && 'response' in error && 
+              (error as any).response?.status === 400 && 
+              (error as any).response?.data?.message?.includes('published and cannot be updated')) {
+            throw new Error('Cannot update published content item. Please create a new version first.');
+          }
+          
           throw error; // Re-throw the original error
         }
       }
     } catch (error) {
       console.error('Error updating contributors:', error);
+      
+      // Check if this is a published variant error
+      if (error && typeof error === 'object' && 'response' in error && 
+          (error as any).response?.status === 400 && 
+          (error as any).response?.data?.message?.includes('published and cannot be updated')) {
+        throw new Error('Cannot update published content item. Please create a new version first.');
+      }
+      
       throw new Error('Failed to update contributors');
     }
   }
@@ -559,11 +591,41 @@ export class ApiService {
         await this.updateContributors(itemId, actualLanguageId || languageCodename, contributorEmails);
         console.log(`Successfully assigned contributors using simple update for item ${itemId}`);
         return; // Exit early if successful
-      } catch (simpleError) {
-        console.log('Simple update failed, trying full variant upsert...');
+      } catch (simpleError: any) {
+        console.log('Simple update failed, checking if it\'s a published variant error...');
         console.log('Simple error:', simpleError);
         
-        // If simple update fails, try the full variant upsert
+        // Check if this is a published variant error that requires a new version
+        if (simpleError.response?.status === 400 && 
+            simpleError.response?.data?.message?.includes('published and cannot be updated')) {
+          console.log('Detected published variant error, creating new version...');
+          
+          if (draftStepId) {
+            try {
+              // Create new version and set to draft
+              await this.createNewVersionAndSetToDraft(
+                itemId, 
+                actualLanguageId || languageCodename, 
+                draftStepId
+              );
+              console.log('Successfully created new version and set to draft');
+              
+              // Now try to update contributors on the new version
+              await this.updateContributors(itemId, actualLanguageId || languageCodename, contributorEmails);
+              console.log('Successfully assigned contributors to new version');
+              return;
+            } catch (workflowError) {
+              console.error('Failed to create new version and set to draft:', workflowError);
+              throw new Error('Failed to create new version for published content item');
+            }
+          } else {
+            throw new Error('Cannot update published content item. Please provide a draft step ID to create a new version.');
+          }
+        }
+        
+        // If it's not a published variant error, try the full variant upsert
+        console.log('Trying full variant upsert...');
+        
         // Convert elements object to array format that the API expects
         const elementsArray = Object.values(currentVariant.elements || {});
         console.log('Elements array:', elementsArray);
