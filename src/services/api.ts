@@ -461,21 +461,55 @@ export class ApiService {
                 
                 const language = languages.find(lang => lang.id === languageId);
                 if (language) {
-                  actualLanguageId = language.id;
+                  // Use the language codename for API calls, not the ID
+                  actualLanguageId = language.codename;
                   languageInfo = language; // Store the language info
-                  console.log(`Found language ID: ${actualLanguageId} for codename: ${languageId}`);
+                  console.log(`Found language: ${language.codename} -> ${language.id}, using codename: ${actualLanguageId}`);
                 } else {
-                  console.log(`Language with ID ${languageId} not found in languages list, using ID as codename`);
-                  actualLanguageId = languageId;
+                  console.log(`Language with ID ${languageId} not found in languages list, trying to find default language...`);
+                  // Fall back to finding a default language
+                  const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
+                  if (defaultLanguage) {
+                    actualLanguageId = defaultLanguage.codename;
+                    languageInfo = defaultLanguage;
+                    console.log(`Using default language: ${defaultLanguage.codename}`);
+                  } else if (languages.length > 0) {
+                    actualLanguageId = languages[0].codename;
+                    languageInfo = languages[0];
+                    console.log(`Using first available language: ${languages[0].codename}`);
+                  } else {
+                    throw new Error('No languages available in the project');
+                  }
                 }
               } catch (languagesError) {
                 console.error('Error getting languages:', languagesError);
-                console.log(`Using language ID ${languageId} as codename`);
-                actualLanguageId = languageId;
+                throw new Error('Could not determine language for content item variant');
               }
             } else {
-              console.log('No language ID found in variant, using default');
-              actualLanguageId = '00000000-0000-0000-0000-000000000000';
+              console.log('No language ID found in variant, trying to find default language...');
+              // Try to find a default language instead of using placeholder GUID
+              try {
+                const languages = await this.getLanguages();
+                const defaultLanguage = languages.find(lang => lang.codename === 'default' || lang.codename === 'en-us' || lang.codename === 'en');
+                if (defaultLanguage) {
+                  actualLanguageId = defaultLanguage.codename;
+                  languageInfo = defaultLanguage;
+                  console.log(`Found default language: ${defaultLanguage.codename}`);
+                } else {
+                  // If no default language found, use the first available language
+                  const firstLanguage = languages[0];
+                  if (firstLanguage) {
+                    actualLanguageId = firstLanguage.codename;
+                    languageInfo = firstLanguage;
+                    console.log(`Using first available language: ${firstLanguage.codename}`);
+                  } else {
+                    throw new Error('No languages available in the project');
+                  }
+                }
+              } catch (langError) {
+                console.error('Error finding default language:', langError);
+                throw new Error('Could not determine language for content item variant');
+              }
             }
             
             // Use the variant data we already have instead of fetching it again
@@ -856,7 +890,9 @@ export class ApiService {
       console.log(`Creating new version for item ${itemId} and setting to draft step ${draftStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
       
-      // First, create a new version
+      // First, try to create a new version with the provided identifier
+      let successfulLanguageId = languageIdentifier;
+      
       try {
         await this.managementApi.post(
           `/items/${itemId}/variants/${languageIdentifier}/new-version`
@@ -868,16 +904,33 @@ export class ApiService {
         // If the identifier fails, try to resolve it as a codename to get the ID
         try {
           const languages = await this.getLanguages();
-          const language = languages.find(lang => lang.codename === languageIdentifier);
+          // Try to find the language by codename first
+          let language = languages.find(lang => lang.codename === languageIdentifier);
+          
+          // If not found by codename, try common default language names
+          if (!language) {
+            language = languages.find(lang => 
+              lang.codename === 'default' || 
+              lang.codename === 'en-us' || 
+              lang.codename === 'en'
+            );
+          }
+          
+          // If still not found, use the first available language
+          if (!language && languages.length > 0) {
+            language = languages[0];
+          }
           
           if (language) {
-            console.log(`Found language: ${language.codename} -> ${language.id}`);
+            // Use the language codename for API calls, not the ID
+            successfulLanguageId = language.codename;
+            console.log(`Found language: ${language.codename} -> ${language.id}, using codename: ${successfulLanguageId}`);
             await this.managementApi.post(
-              `/items/${itemId}/variants/${language.id}/new-version`
+              `/items/${itemId}/variants/${language.codename}/new-version`
             );
-            console.log('New version created successfully with resolved language ID');
+            console.log('New version created successfully with resolved language codename');
           } else {
-            throw new Error(`Language not found for codename: ${languageIdentifier}`);
+            throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
           }
         } catch (resolveError) {
           console.error('Failed to resolve language identifier:', resolveError);
@@ -888,12 +941,12 @@ export class ApiService {
       
       // Then change the workflow step to draft
       console.log('Changing workflow step to draft...');
-      await this.changeWorkflowStep(itemId, languageIdentifier, draftStepId);
+      await this.changeWorkflowStep(itemId, successfulLanguageId, draftStepId);
       console.log('Workflow step changed to draft successfully');
       
       // Get the updated variant data to return
       console.log('Fetching updated variant data...');
-      const newVariant = await this.getContentItem(itemId, languageIdentifier);
+      const newVariant = await this.getContentItem(itemId, successfulLanguageId);
       console.log('Retrieved new variant data after workflow change:', newVariant);
       console.log('New variant workflow step:', newVariant.workflow_step);
       console.log('New variant workflow:', newVariant.workflow);
