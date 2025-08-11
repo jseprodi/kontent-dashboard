@@ -497,6 +497,9 @@ export class ApiService {
       const isPublished = currentWorkflowStep?.codename === 'published';
       const isArchived = currentWorkflowStep?.codename === 'archived';
       
+      console.log('Current workflow step before check:', currentWorkflowStep);
+      console.log('Is published:', isPublished, 'Is archived:', isArchived);
+      
       if ((isPublished || isArchived) && draftStepId) {
         console.log(`Item is ${isPublished ? 'published' : 'archived'}, creating new version and setting to draft...`);
         
@@ -510,6 +513,7 @@ export class ApiService {
           console.log('Successfully created new version and set to draft');
           currentVariant = newDraftVariant; // Update currentVariant to the new draft version
           console.log('Updated current variant to new draft version:', currentVariant);
+          console.log('New variant workflow step:', currentVariant.workflow_step);
         } catch (workflowError) {
           console.error('Failed to create new version and set to draft:', workflowError);
           throw new Error('Failed to create new version for published/archived content item'); // Re-throw to stop assignment
@@ -525,14 +529,20 @@ export class ApiService {
       const elementsArray = Object.values(currentVariant.elements || {});
       console.log('Elements array before updating contributors:', elementsArray);
       
+      // Ensure we have the correct workflow step information
       const updatedVariant = {
         ...currentVariant,
         elements: elementsArray,
         // Explicitly set the contributors field with resolved user IDs
         contributors: contributorUserIds.map(userId => ({ id: userId })),
+        // Ensure workflow step is correctly set for the new draft version
+        workflow_step: currentVariant.workflow_step,
+        workflow: currentVariant.workflow,
       };
 
       console.log('Updated variant data for upsert:', updatedVariant);
+      console.log('Final workflow step in updated variant:', updatedVariant.workflow_step);
+      console.log('Final workflow in updated variant:', updatedVariant.workflow);
 
       // Upsert the updated variant using the actual language ID and language info
       await this.upsertLanguageVariant(itemId, actualLanguageId || languageCodename, updatedVariant, languageInfo);
@@ -848,12 +858,16 @@ export class ApiService {
       }
       
       // Then change the workflow step to draft
+      console.log('Changing workflow step to draft...');
       await this.changeWorkflowStep(itemId, languageCodename, draftStepId);
       console.log('Workflow step changed to draft successfully');
       
       // Get the updated variant data to return
+      console.log('Fetching updated variant data...');
       const newVariant = await this.getContentItem(itemId, languageCodename);
       console.log('Retrieved new variant data after workflow change:', newVariant);
+      console.log('New variant workflow step:', newVariant.workflow_step);
+      console.log('New variant workflow:', newVariant.workflow);
       
       return newVariant;
       
