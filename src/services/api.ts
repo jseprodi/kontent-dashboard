@@ -916,15 +916,20 @@ export class ApiService {
             console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change`);
             console.log('Full default workflow object:', JSON.stringify(defaultWorkflow, null, 2));
             
-            // Use the official workflow step change endpoint for archived items
-            // This endpoint is at the project level, not subscription level
-            await this.managementApi.put(
-              `/items/${itemId}/variants/${languageIdentifier}/workflow`,
-              {
-                workflow_identifier: { codename: defaultWorkflow.codename },
-                step_identifier: { id: workflowStepId }
-              }
-            );
+                    // Use the official workflow step change endpoint for archived items
+        // This endpoint is at the project level, not subscription level
+        // Use the original language identifier (codename) instead of resolved ID for the URL path
+        const urlLanguageIdentifier = typeof languageIdentifier === 'string' && languageIdentifier !== '00000000-0000-0000-0000-000000000000' 
+          ? languageIdentifier 
+          : 'default'; // Fallback to 'default' if we have the placeholder ID
+        
+        await this.managementApi.put(
+          `/items/${itemId}/variants/${urlLanguageIdentifier}/workflow`,
+          {
+            workflow_identifier: { codename: defaultWorkflow.codename },
+            step_identifier: { id: workflowStepId }
+          }
+        );
             console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
             return; // Success, exit early
             
@@ -1111,8 +1116,11 @@ export class ApiService {
                 
                 // Use the official workflow step change endpoint for archived items
                 // This endpoint is at the project level, not subscription level
+                // Use the language codename instead of ID for the URL path
+                const urlLanguageIdentifier = language.codename || 'default';
+                
                 await this.managementApi.put(
-                  `/items/${itemId}/variants/${language.id}/workflow`,
+                  `/items/${itemId}/variants/${urlLanguageIdentifier}/workflow`,
                   {
                     workflow_identifier: { codename: defaultWorkflow.codename },
                     step_identifier: { id: workflowStepId }
@@ -1174,8 +1182,11 @@ export class ApiService {
                 
                 console.log(`Using workflow codename: ${defaultWorkflow.codename} for published item workflow change (resolved language)`);
                 
+                // Use the language codename instead of ID for the URL path
+                const urlLanguageIdentifier = language.codename || 'default';
+                
                 await this.managementApi.put(
-                  `/items/${itemId}/variants/${language.id}/unpublish`
+                  `/items/${itemId}/variants/${urlLanguageIdentifier}/unpublish`
                 );
                 console.log(`Successfully unpublished item ${itemId} with resolved language ID: ${language.id}`);
                 
