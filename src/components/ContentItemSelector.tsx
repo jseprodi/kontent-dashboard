@@ -83,9 +83,19 @@ export function ContentItemSelector({
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Loading content items...</p>
+      <div className="skeleton-loader">
+        <div className="skeleton-header"></div>
+        <div className="skeleton-content">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="skeleton-row">
+              <div className="skeleton-checkbox"></div>
+              <div className="skeleton-text">
+                <div className="skeleton-title"></div>
+                <div className="skeleton-subtitle"></div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

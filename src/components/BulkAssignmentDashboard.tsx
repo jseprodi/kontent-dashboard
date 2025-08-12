@@ -124,22 +124,22 @@ export function BulkAssignmentDashboard({ apiService }: BulkAssignmentDashboardP
                       <strong>Total Assignments:</strong> {selectedContentItems.length * selectedContributors.length}
                     </div>
                   </div>
-                  
-                  <div className="assignment-actions">
-                    <button
-                      onClick={handleAssign}
-                      disabled={isAssigning}
-                      className="assign-button"
-                    >
-                      {isAssigning ? 'Assigning...' : 'Assign Contributors'}
-                    </button>
-                    <button
-                      onClick={resetSelection}
-                      className="reset-button"
-                    >
-                      Reset Selection
-                    </button>
-                  </div>
+                </div>
+                
+                <div className="assignment-actions">
+                  <button
+                    onClick={handleAssign}
+                    disabled={isAssigning}
+                    className="assign-btn"
+                  >
+                    {isAssigning ? 'Assigning...' : 'Assign Contributors'}
+                  </button>
+                  <button
+                    onClick={resetSelection}
+                    className="button secondary"
+                  >
+                    Reset Selection
+                  </button>
                 </div>
 
                 <AssignmentResults
