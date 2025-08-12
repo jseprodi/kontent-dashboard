@@ -15,15 +15,16 @@
 import { useState } from 'react';
 import { BulkAssignmentDashboard } from './components/BulkAssignmentDashboard';
 import { WorkflowManager } from './components/WorkflowManager';
+import { ContributorDashboard } from './components/ContributorDashboard';
 import { useCustomAppContext, useEnvironmentId } from './hooks';
 import { ApiService } from './services/api';
-import { Users, Workflow } from 'lucide-react';
+import { Users, Workflow, BarChart3 } from 'lucide-react';
 
 /**
  * Main application component with tabbed interface
  */
 export function IntegrationApp() {
-  const [activeTab, setActiveTab] = useState<'bulk-assignment' | 'workflow'>('bulk-assignment');
+  const [activeTab, setActiveTab] = useState<'bulk-assignment' | 'workflow' | 'dashboard'>('bulk-assignment');
   const appContext = useCustomAppContext();
   const environmentId = useEnvironmentId();
 
@@ -134,6 +135,13 @@ export function IntegrationApp() {
               <Workflow size={20} />
               Workflow Management
             </button>
+            <button
+              className={`tab-button ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <BarChart3 size={20} />
+              Contributor Dashboard
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -143,6 +151,9 @@ export function IntegrationApp() {
             )}
             {activeTab === 'workflow' && apiService && (
               <WorkflowManager apiService={apiService} />
+            )}
+            {activeTab === 'dashboard' && apiService && (
+              <ContributorDashboard apiService={apiService} />
             )}
           </div>
         </>
