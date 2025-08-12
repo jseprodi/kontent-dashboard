@@ -84,6 +84,10 @@ export interface AssignmentResult {
   contentItemId: string;
   success: boolean;
   error?: string;
+  requiresManualIntervention?: boolean;
+  reason?: string;
+  message?: string;
+  instructions?: string;
 }
 
 export interface BulkAssignmentState {

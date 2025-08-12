@@ -463,7 +463,7 @@ export class ApiService {
     languageIdentifier: string,
     contributorEmails: string[],
     draftStepId?: string
-  ): Promise<void> {
+  ): Promise<{ success: boolean; requiresManualIntervention?: boolean; reason?: string; message: string; instructions?: string }> {
     try {
       console.log(`Assigning contributors to item ${itemId} with language: ${languageIdentifier}`);
       
@@ -619,7 +619,13 @@ export class ApiService {
           console.log(`Changing workflow step to draft step: ${draftStepId}`);
           
           // Use the workflow API to change the step first
-          await this.changeWorkflowStep(itemId, actualLanguageId, draftStepId);
+          const workflowResult = await this.changeWorkflowStep(itemId, actualLanguageId, draftStepId);
+          
+          // Check if the workflow change requires manual intervention
+          if (workflowResult && workflowResult.requiresManualIntervention) {
+            return workflowResult;
+          }
+          
           console.log(`Successfully changed workflow step to draft for item ${itemId}`);
           
           // Now fetch the updated variant to get the current state
@@ -659,6 +665,12 @@ export class ApiService {
       // Upsert the updated variant using the actual language ID and language info
       await this.upsertLanguageVariant(itemId, actualLanguageId, updatedVariant, languageInfo);
       console.log(`Successfully assigned contributors using full variant upsert for item ${itemId}`);
+      
+      // Return success result
+      return {
+        success: true,
+        message: 'Contributors assigned successfully'
+      };
     } catch (error) {
       console.error('Error assigning contributors:', error);
       throw new Error('Failed to assign contributors');
@@ -676,18 +688,22 @@ export class ApiService {
     
     for (const assignment of assignments) {
       try {
-        await this.assignContributors(
+        const result = await this.assignContributors(
           assignment.contentItemId,
           assignment.languageCodename,
           assignment.contributors,
           draftStepId
         );
         
-        results.push({
-          success: true,
-          itemId: assignment.contentItemId,
-          message: 'Contributors assigned successfully',
-        });
+        if (result.requiresManualIntervention) {
+          results.push(result);
+        } else {
+          results.push({
+            success: true,
+            itemId: assignment.contentItemId,
+            message: 'Contributors assigned successfully',
+          });
+        }
       } catch (error) {
         results.push({
           success: false,
@@ -881,7 +897,7 @@ export class ApiService {
     itemId: string,
     languageIdentifier: string,
     workflowStepId: string
-  ): Promise<void> {
+  ): Promise<{ success: boolean; requiresManualIntervention?: boolean; reason?: string; message: string; instructions?: string }> {
     try {
       console.log(`Changing workflow step for item ${itemId} to step ${workflowStepId}`);
       console.log(`Using language identifier: ${languageIdentifier}`);
@@ -903,136 +919,46 @@ export class ApiService {
         const isPublished = currentWorkflowStep?.id === 'c199950d-99f0-4983-b711-6c4c91624b22'; // Published step ID
         const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391'; // Archived step ID
         
-        if (isArchived) {
-          // For archived items, we need to try a different approach since direct modification doesn't work
-          console.log('Item is archived, trying alternative approaches...');
+        // Get the default workflow to use its ID for the workflow_identifier
+        let defaultWorkflow: any;
+        try {
+          const workflows = await this.getWorkflows();
+          defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
           
-          try {
-            // Get the default workflow to understand the target step
-            const workflows = await this.getWorkflows();
-            const defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-            
-            if (!defaultWorkflow) {
-              throw new Error('No default workflow found for archived item handling');
-            }
-            
-            console.log(`Attempting to handle archived item ${itemId} with workflow step ${workflowStepId}`);
-            
-            // Try approach 1: Use the "restore" endpoint if it exists
-            try {
-              console.log('Trying restore endpoint for archived item...');
-              await this.managementApi.post(
-                `/items/${itemId}/restore`,
-                {
-                  workflow_step: {
-                    id: workflowStepId
-                  }
-                }
-              );
-              console.log(`Successfully restored archived item ${itemId} to workflow step ${workflowStepId}`);
-              return; // Success, exit early
-            } catch (restoreError) {
-              console.log('Restore endpoint failed, trying alternative method...');
-            }
-            
-            // Try approach 2: Use the "unarchive" endpoint if it exists
-            try {
-              console.log('Trying unarchive endpoint for archived item...');
-              await this.managementApi.post(
-                `/items/${itemId}/unarchive`,
-                {
-                  workflow_step: {
-                    id: workflowStepId
-                  }
-                }
-              );
-              console.log(`Successfully unarchived item ${itemId} to workflow step ${workflowStepId}`);
-              return; // Success, exit early
-            } catch (unarchiveError) {
-              console.log('Unarchive endpoint failed, trying alternative method...');
-            }
-            
-            // Try approach 3: Use the "activate" endpoint if it exists
-            try {
-              console.log('Trying activate endpoint for archived item...');
-              await this.managementApi.post(
-                `/items/${itemId}/activate`,
-                {
-                  workflow_step: {
-                    id: workflowStepId
-                  }
-                }
-              );
-              console.log(`Successfully activated archived item ${itemId} to workflow step ${workflowStepId}`);
-              return; // Success, exit early
-            } catch (activateError) {
-              console.log('Activate endpoint failed, trying alternative method...');
-            }
-            
-            // Try approach 4: Use the "publish" endpoint with force flag if it exists
-            try {
-              console.log('Trying force publish endpoint for archived item...');
-              await this.managementApi.post(
-                `/items/${itemId}/publish`,
-                {
-                  workflow_step: {
-                    id: workflowStepId
-                  },
-                  force: true
-                }
-              );
-              console.log(`Successfully force published archived item ${itemId} to workflow step ${workflowStepId}`);
-              return; // Success, exit early
-            } catch (forcePublishError) {
-              console.log('Force publish endpoint failed, trying alternative method...');
-            }
-            
-            // Try approach 5: Use the "workflow" endpoint with different parameters
-            try {
-              console.log('Trying workflow endpoint with different parameters for archived item...');
-              await this.managementApi.put(
-                `/items/${itemId}/workflow`,
-                {
-                  workflow_identifier: { id: defaultWorkflow.id },
-                  step_identifier: { id: workflowStepId },
-                  force: true,
-                  skip_validation: true
-                }
-              );
-              console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} using workflow endpoint with force`);
-              return; // Success, exit early
-            } catch (workflowForceError) {
-              console.log('Workflow endpoint with force failed, trying alternative method...');
-            }
-            
-            // If all approaches fail, throw a comprehensive error
-            console.error('All alternative approaches for archived item failed');
-            throw new Error(`Cannot modify archived content item. All alternative approaches failed. This item may require manual intervention in the Kontent.ai interface.`);
-            
-          } catch (alternativeError) {
-            console.error('Failed to handle archived item with alternative approaches:', alternativeError);
-            throw new Error(`Cannot modify archived content item. All approaches failed: ${alternativeError instanceof Error ? alternativeError.message : String(alternativeError)}`);
+          if (!defaultWorkflow) {
+            throw new Error('No default workflow found for workflow change');
           }
-        } else if (isPublished) {
+          
+          console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change`);
+        } catch (workflowError) {
+          console.warn('Could not get default workflow, using fallback:', workflowError);
+          defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
+        }
+        
+        if (isArchived) {
+          // For archived items, we cannot modify them through the API
+          // Return a special result indicating manual intervention is required
+          console.log(`Item ${itemId} is archived and cannot be modified through the API. Manual intervention required.`);
+          
+          // Return a special result object instead of throwing an error
+          // This allows the bulk assignment to continue with other items
+          return {
+            success: false,
+            requiresManualIntervention: true,
+            reason: 'archived',
+            message: 'This item is archived and must be manually restored in the Kontent.ai interface before contributors can be assigned.',
+            instructions: 'To restore this item: 1) Go to the Kontent.ai interface, 2) Find this item in the archived state, 3) Click "Restore" or change its workflow step to Draft, 4) Run the bulk assignment again.'
+          };
+        }
+        
+        if (isPublished) {
           // For published items, try to unpublish first, then update
           console.log('Item is published, trying to unpublish first...');
           
-          // Get the default workflow to use its ID for the workflow_identifier
-          let defaultWorkflow: any;
           try {
-            const workflows = await this.getWorkflows();
-            defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-            
-            if (!defaultWorkflow) {
-              throw new Error('No default workflow found for workflow change');
-            }
-            
-            console.log(`Using workflow codename: ${defaultWorkflow.codename} for published item workflow change`);
-            console.log('Full default workflow object (published):', JSON.stringify(defaultWorkflow, null, 2));
-            
-                         await this.managementApi.put(
-               `/items/${itemId}/variants/${actualLanguageId}/unpublish`
-             );
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${actualLanguageId}/unpublish`
+            );
             console.log(`Successfully unpublished item ${itemId}`);
             
             // Now try to update the workflow step
@@ -1054,48 +980,41 @@ export class ApiService {
             await this.upsertLanguageVariant(itemId, actualLanguageId, updatedVariantData, currentVariant.language);
             console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} after unpublishing`);
             
+            return {
+              success: true,
+              message: 'Workflow step changed successfully after unpublishing'
+            };
           } catch (unpublishError) {
             console.error('Failed to unpublish item:', unpublishError);
-            const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
-            throw new Error(`Cannot modify published content item. Failed to unpublish: ${errorMessage}`);
+            throw new Error('Failed to unpublish published content item');
           }
         } else {
-          // For draft items, we can update the variant directly
-          console.log('Item is in draft state, updating variant directly...');
+          // If we reach here, the item is in draft state and can be updated directly
+          console.log('Item is in draft state, updating workflow step directly...');
           
-          // Get the default workflow to use its ID for the workflow_identifier
-          let defaultWorkflow: any;
-          try {
-            const workflows = await this.getWorkflows();
-            defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-            
-            if (!defaultWorkflow) {
-              throw new Error('No default workflow found for workflow change');
-            }
-            
-            console.log(`Using workflow codename: ${defaultWorkflow.codename} for draft item workflow change`);
-          } catch (workflowError) {
-            console.warn('Could not get default workflow, using fallback:', workflowError);
-            defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
-          }
-          
-          // Create updated variant data with the new workflow step
+          // Update the variant with the new workflow step
           const updatedVariantData = {
             ...currentVariant,
             workflow_step: {
               id: workflowStepId
             },
             workflow: {
-              workflow_identifier: { codename: defaultWorkflow.codename },
+              workflow_identifier: { id: defaultWorkflow.id },
               step_identifier: { id: workflowStepId }
             }
           };
           
-          console.log('Updated variant data for workflow change:', updatedVariantData);
+          delete updatedVariantData.id;
+          delete updatedVariantData.last_modified;
+          delete updatedVariantData.version;
           
-          // Update the variant with the new workflow step
           await this.upsertLanguageVariant(itemId, actualLanguageId, updatedVariantData, currentVariant.language);
-          console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId}`);
+          console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId}`);
+          
+          return {
+            success: true,
+            message: 'Workflow step changed successfully'
+          };
         }
         
             } catch (error) {
