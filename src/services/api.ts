@@ -936,19 +936,49 @@ export class ApiService {
         }
         
         if (isArchived) {
-          // For archived items, we cannot modify them through the API
-          // Return a special result indicating manual intervention is required
-          console.log(`Item ${itemId} is archived and cannot be modified through the API. Manual intervention required.`);
+          // For archived items, use the specific change-workflow endpoint
+          console.log(`Item ${itemId} is archived, using change-workflow endpoint...`);
           
-          // Return a special result object instead of throwing an error
-          // This allows the bulk assignment to continue with other items
-          return {
-            success: false,
-            requiresManualIntervention: true,
-            reason: 'archived',
-            message: 'This item is archived and must be manually restored in the Kontent.ai interface before contributors can be assigned.',
-            instructions: 'To restore this item: 1) Go to the Kontent.ai interface, 2) Find this item in the archived state, 3) Click "Restore" or change its workflow step to Draft, 4) Run the bulk assignment again.'
-          };
+          try {
+            // Get the default workflow to understand the target step
+            const workflows = await this.getWorkflows();
+            const defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+            
+            if (!defaultWorkflow) {
+              throw new Error('No default workflow found for archived item handling');
+            }
+            
+            console.log(`Attempting to change workflow for archived item ${itemId} to step ${workflowStepId}`);
+            
+            // Use the specific change-workflow endpoint for archived items
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${actualLanguageId}/change-workflow`,
+              {
+                workflow_step: {
+                  id: workflowStepId
+                }
+              }
+            );
+            
+            console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
+            return {
+              success: true,
+              message: 'Workflow step changed successfully for archived item'
+            };
+            
+          } catch (changeWorkflowError) {
+            console.error('Failed to change workflow for archived item:', changeWorkflowError);
+            
+            // If the change-workflow endpoint fails, return manual intervention result
+            console.log('Change-workflow endpoint failed for archived item, manual intervention required');
+            return {
+              success: false,
+              requiresManualIntervention: true,
+              reason: 'archived',
+              message: 'This item is archived and the change-workflow endpoint failed. Manual intervention may be required.',
+              instructions: 'To restore this item: 1) Go to the Kontent.ai interface, 2) Find this item in the archived state, 3) Click "Restore" or change its workflow step to Draft, 4) Run the bulk assignment again.'
+            };
+          }
         }
         
         if (isPublished) {
