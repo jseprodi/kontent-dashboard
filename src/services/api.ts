@@ -954,7 +954,10 @@ export class ApiService {
             await this.managementApi.put(
               `/items/${itemId}/variants/${actualLanguageId}/change-workflow`,
               {
-                workflow_step: {
+                workflow_identifier: {
+                  id: defaultWorkflow.id
+                },
+                step_identifier: {
                   id: workflowStepId
                 }
               }
