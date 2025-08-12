@@ -920,15 +920,15 @@ export class ApiService {
             console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change`);
             console.log('Full default workflow object:', JSON.stringify(defaultWorkflow, null, 2));
             
-            // Use the official workflow step change endpoint for archived items
-            // This endpoint is at the project level, not subscription level
-            await this.managementApi.put(
-              `/items/${itemId}/variants/${actualLanguageId}/workflow`,
-              {
-                workflow_identifier: { codename: defaultWorkflow.codename },
-                step_identifier: { id: workflowStepId }
-              }
-            );
+                         // Use the official workflow step change endpoint for archived items
+             // According to the API documentation, this should be at the item level
+             await this.managementApi.put(
+               `/items/${itemId}/workflow`,
+               {
+                 workflow_identifier: { codename: defaultWorkflow.codename },
+                 step_identifier: { id: workflowStepId }
+               }
+             );
             console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
             return; // Success, exit early
             
@@ -940,17 +940,17 @@ export class ApiService {
             try {
               console.log('Creating new version for archived item using fallback method...');
               
-              // Create new version data with updated workflow step
-              const newVersionData = {
-                ...currentVariant,
-                workflow_step: {
-                  id: workflowStepId
-                },
-                workflow: {
-                  workflow_identifier: { codename: defaultWorkflow.codename },
-                  step_identifier: { id: workflowStepId }
-                }
-              };
+                             // Create new version data with updated workflow step
+               const newVersionData = {
+                 ...currentVariant,
+                 workflow_step: {
+                   id: workflowStepId
+                 },
+                 workflow: {
+                   workflow_identifier: { codename: defaultWorkflow.codename },
+                   step_identifier: { id: workflowStepId }
+                 }
+               };
               
               // Remove fields that shouldn't be copied to new version
               delete newVersionData.id;
@@ -986,9 +986,9 @@ export class ApiService {
             console.log(`Using workflow codename: ${defaultWorkflow.codename} for published item workflow change`);
             console.log('Full default workflow object (published):', JSON.stringify(defaultWorkflow, null, 2));
             
-            await this.managementApi.put(
-              `/items/${itemId}/variants/${languageIdentifier}/unpublish`
-            );
+                         await this.managementApi.put(
+               `/items/${itemId}/variants/${actualLanguageId}/unpublish`
+             );
             console.log(`Successfully unpublished item ${itemId}`);
             
             // Now try to update the workflow step
