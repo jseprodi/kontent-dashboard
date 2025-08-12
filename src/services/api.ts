@@ -904,9 +904,9 @@ export class ApiService {
           console.log('Item is archived, trying workflow change endpoint first...');
           try {
             // Use the official workflow step change endpoint for archived items
-            // Note: This endpoint should be at the subscription level, not project level
-            await this.subscriptionApi.put(
-              `/variants/${languageIdentifier}/workflow`,
+            // This endpoint is at the project level, not subscription level
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${languageIdentifier}/workflow`,
               {
                 workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
                 step_identifier: { id: workflowStepId }
@@ -1055,9 +1055,9 @@ export class ApiService {
               console.log('Item is archived with resolved language, trying workflow change endpoint first...');
               try {
                 // Use the official workflow step change endpoint for archived items
-                // Note: This endpoint should be at the subscription level, not project level
-                await this.subscriptionApi.put(
-                  `/variants/${language.id}/workflow`,
+                // This endpoint is at the project level, not subscription level
+                await this.managementApi.put(
+                  `/items/${itemId}/variants/${language.id}/workflow`,
                   {
                     workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
                     step_identifier: { id: workflowStepId }
