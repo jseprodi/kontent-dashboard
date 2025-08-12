@@ -1666,7 +1666,7 @@ body {
 
 .filter-tabs {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-lg);
   margin-bottom: var(--spacing-xl);
   border-bottom: 1px solid var(--border-color);
 }
