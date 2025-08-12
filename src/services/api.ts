@@ -913,7 +913,7 @@ export class ApiService {
               throw new Error('No default workflow found for workflow change');
             }
             
-            console.log(`Using workflow ID: ${defaultWorkflow.id} for workflow change`);
+            console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change`);
             console.log('Full default workflow object:', JSON.stringify(defaultWorkflow, null, 2));
             
             // Use the official workflow step change endpoint for archived items
@@ -921,7 +921,7 @@ export class ApiService {
             await this.managementApi.put(
               `/items/${itemId}/variants/${languageIdentifier}/workflow`,
               {
-                workflow_identifier: { id: defaultWorkflow.id },
+                workflow_identifier: { codename: defaultWorkflow.codename },
                 step_identifier: { id: workflowStepId }
               }
             );
@@ -943,7 +943,7 @@ export class ApiService {
                   id: workflowStepId
                 },
                 workflow: {
-                  workflow_identifier: { id: defaultWorkflow.id },
+                  workflow_identifier: { codename: defaultWorkflow.codename },
                   step_identifier: { id: workflowStepId }
                 }
               };
@@ -979,7 +979,7 @@ export class ApiService {
               throw new Error('No default workflow found for workflow change');
             }
             
-            console.log(`Using workflow ID: ${defaultWorkflow.id} for published item workflow change`);
+            console.log(`Using workflow codename: ${defaultWorkflow.codename} for published item workflow change`);
             console.log('Full default workflow object (published):', JSON.stringify(defaultWorkflow, null, 2));
             
             await this.managementApi.put(
@@ -994,7 +994,7 @@ export class ApiService {
                 id: workflowStepId
               },
               workflow: {
-                workflow_identifier: { id: defaultWorkflow.id },
+                workflow_identifier: { codename: defaultWorkflow.codename },
                 step_identifier: { id: workflowStepId }
               }
             };
@@ -1025,7 +1025,7 @@ export class ApiService {
               throw new Error('No default workflow found for workflow change');
             }
             
-            console.log(`Using workflow ID: ${defaultWorkflow.id} for draft item workflow change`);
+            console.log(`Using workflow codename: ${defaultWorkflow.codename} for draft item workflow change`);
           } catch (workflowError) {
             console.warn('Could not get default workflow, using fallback:', workflowError);
             defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
@@ -1038,7 +1038,7 @@ export class ApiService {
               id: workflowStepId
             },
             workflow: {
-              workflow_identifier: { id: defaultWorkflow.id },
+              workflow_identifier: { codename: defaultWorkflow.codename },
               step_identifier: { id: workflowStepId }
             }
           };
@@ -1106,7 +1106,7 @@ export class ApiService {
                   throw new Error('No default workflow found for workflow change');
                 }
                 
-                console.log(`Using workflow ID: ${defaultWorkflow.id} for workflow change (resolved language)`);
+                console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change (resolved language)`);
             console.log('Full default workflow object (resolved language):', JSON.stringify(defaultWorkflow, null, 2));
                 
                 // Use the official workflow step change endpoint for archived items
@@ -1114,7 +1114,7 @@ export class ApiService {
                 await this.managementApi.put(
                   `/items/${itemId}/variants/${language.id}/workflow`,
                   {
-                    workflow_identifier: { id: defaultWorkflow.id },
+                    workflow_identifier: { codename: defaultWorkflow.codename },
                     step_identifier: { id: workflowStepId }
                   }
                 );
@@ -1136,7 +1136,7 @@ export class ApiService {
                       id: workflowStepId
                     },
                     workflow: {
-                      workflow_identifier: { id: defaultWorkflow.id },
+                      workflow_identifier: { codename: defaultWorkflow.codename },
                       step_identifier: { id: workflowStepId }
                     }
                   };
@@ -1172,7 +1172,7 @@ export class ApiService {
                   throw new Error('No default workflow found for workflow change');
                 }
                 
-                console.log(`Using workflow ID: ${defaultWorkflow.id} for published item workflow change (resolved language)`);
+                console.log(`Using workflow codename: ${defaultWorkflow.codename} for published item workflow change (resolved language)`);
                 
                 await this.managementApi.put(
                   `/items/${itemId}/variants/${language.id}/unpublish`
@@ -1186,7 +1186,7 @@ export class ApiService {
                     id: workflowStepId
                   },
                   workflow: {
-                    workflow_identifier: { id: defaultWorkflow.id },
+                    workflow_identifier: { codename: defaultWorkflow.codename },
                     step_identifier: { id: workflowStepId }
                   }
                 };
@@ -1217,7 +1217,7 @@ export class ApiService {
                   throw new Error('No default workflow found for workflow change');
                 }
                 
-                console.log(`Using workflow ID: ${defaultWorkflow.id} for draft item workflow change (resolved language)`);
+                console.log(`Using workflow codename: ${defaultWorkflow.codename} for draft item workflow change (resolved language)`);
               } catch (workflowError) {
                 console.warn('Could not get default workflow, using fallback:', workflowError);
                 defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
@@ -1229,7 +1229,7 @@ export class ApiService {
                   id: workflowStepId
                 },
                 workflow: {
-                  workflow_identifier: { id: defaultWorkflow.id },
+                  workflow_identifier: { codename: defaultWorkflow.codename },
                   step_identifier: { id: workflowStepId }
                 }
               };
