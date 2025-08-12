@@ -29,17 +29,24 @@ export function ContributorDashboard({ apiService }: ContributorDashboardProps) 
     setIsLoading(true);
     setError(null);
     try {
+      console.log('Loading dashboard data...');
+      
       const [contributorsData, contentItemsData] = await Promise.all([
         apiService.getUsers(),
         apiService.getContentItems()
       ]);
 
+      console.log('Raw contributors data:', contributorsData);
+      console.log('Raw content items data:', contentItemsData);
+
       setContributors(contributorsData);
       setContentItems(contentItemsData);
 
       const assignments = processContributorAssignments(contributorsData, contentItemsData);
+      console.log('Final assignments:', assignments);
       setContributorAssignments(assignments);
     } catch (err) {
+      console.error('Error loading dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
     } finally {
       setIsLoading(false);
@@ -47,10 +54,43 @@ export function ContributorDashboard({ apiService }: ContributorDashboardProps) 
   };
 
   const processContributorAssignments = (contributors: User[], items: ContentItem[]): ContributorAssignment[] => {
+    console.log('Processing contributor assignments...');
+    console.log('Contributors:', contributors);
+    console.log('Content items:', items);
+    
     return contributors.map(contributor => {
-      const assignedItems = items.filter(item => 
-        item.contributors && item.contributors.includes(contributor.id)
-      );
+      console.log(`Processing contributor: ${contributor.email} (ID: ${contributor.id})`);
+      
+      const assignedItems = items.filter(item => {
+        console.log(`Checking item: ${item.name} (ID: ${item.id})`);
+        console.log(`Item contributors:`, item.contributors);
+        console.log(`Contributor ID to match: ${contributor.id}`);
+        
+        if (!item.contributors) {
+          console.log(`No contributors found for item ${item.name}`);
+          return false;
+        }
+        
+        // Check if contributors is an array of strings (IDs)
+        if (Array.isArray(item.contributors)) {
+          // Handle both string IDs and object IDs
+          const hasContributor = item.contributors.some((contributorRef: any) => {
+            if (typeof contributorRef === 'string') {
+              return contributorRef === contributor.id;
+            } else if (contributorRef && typeof contributorRef === 'object' && contributorRef.id) {
+              return contributorRef.id === contributor.id;
+            }
+            return false;
+          });
+          console.log(`Array check result: ${hasContributor}`);
+          return hasContributor;
+        }
+        
+        console.log(`Unexpected contributors format:`, item.contributors);
+        return false;
+      });
+      
+      console.log(`Found ${assignedItems.length} assigned items for ${contributor.email}`);
 
       const publishedItems = assignedItems.filter(item => 
         item.workflow_step?.codename === 'published' || 
