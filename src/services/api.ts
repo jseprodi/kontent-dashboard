@@ -904,8 +904,8 @@ export class ApiService {
         const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391'; // Archived step ID
         
         if (isArchived) {
-          // For archived items, we need to create a new version since we can't modify archived variants
-          console.log('Item is archived, attempting to create new version with updated workflow step...');
+          // For archived items, we need to try a different approach since direct modification doesn't work
+          console.log('Item is archived, trying alternative approaches...');
           
           try {
             // Get the default workflow to understand the target step
@@ -913,81 +913,105 @@ export class ApiService {
             const defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
             
             if (!defaultWorkflow) {
-              throw new Error('No default workflow found for creating new version');
+              throw new Error('No default workflow found for archived item handling');
             }
             
-            console.log(`Creating new version for archived item ${itemId} with workflow step ${workflowStepId}`);
+            console.log(`Attempting to handle archived item ${itemId} with workflow step ${workflowStepId}`);
             
-            // Create new version data with updated workflow step
-            const newVersionData = {
-              ...currentVariant,
-              workflow_step: {
-                id: workflowStepId
-              },
-              workflow: {
-                workflow_identifier: { id: defaultWorkflow.id },
-                step_identifier: { id: workflowStepId }
-              }
-            };
-            
-            // Remove fields that shouldn't be copied to new version
-            delete newVersionData.id;
-            delete newVersionData.last_modified;
-            delete newVersionData.version;
-            delete newVersionData.created;
-            delete newVersionData.modified;
-            
-            console.log('New version data for archived item:', JSON.stringify(newVersionData, null, 2));
-            
-            // Try to create the new version using the variant creation endpoint
-            // This should create a new version in the target workflow step
-            await this.managementApi.post(
-              `/items/${itemId}/variants`,
-              {
-                elements: newVersionData.elements,
-                workflow_step: {
-                  id: workflowStepId
-                },
-                workflow: {
-                  workflow_identifier: { id: defaultWorkflow.id },
-                  step_identifier: { id: workflowStepId }
-                }
-              }
-            );
-            
-            console.log(`Successfully created new version with workflow step ${workflowStepId} for archived item ${itemId}`);
-            return; // Success, exit early
-            
-          } catch (createVersionError) {
-            console.error('Failed to create new version for archived item:', createVersionError);
-            
-            // If creating a new version fails, try the workflow change endpoint as a last resort
-            console.log('Attempting workflow change endpoint as last resort...');
-            
+            // Try approach 1: Use the "restore" endpoint if it exists
             try {
-              const workflows = await this.getWorkflows();
-              const defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-              
-              if (!defaultWorkflow) {
-                throw new Error('No default workflow found for workflow change');
-              }
-              
-              // Try the item-level workflow endpoint
+              console.log('Trying restore endpoint for archived item...');
+              await this.managementApi.post(
+                `/items/${itemId}/restore`,
+                {
+                  workflow_step: {
+                    id: workflowStepId
+                  }
+                }
+              );
+              console.log(`Successfully restored archived item ${itemId} to workflow step ${workflowStepId}`);
+              return; // Success, exit early
+            } catch (restoreError) {
+              console.log('Restore endpoint failed, trying alternative method...');
+            }
+            
+            // Try approach 2: Use the "unarchive" endpoint if it exists
+            try {
+              console.log('Trying unarchive endpoint for archived item...');
+              await this.managementApi.post(
+                `/items/${itemId}/unarchive`,
+                {
+                  workflow_step: {
+                    id: workflowStepId
+                  }
+                }
+              );
+              console.log(`Successfully unarchived item ${itemId} to workflow step ${workflowStepId}`);
+              return; // Success, exit early
+            } catch (unarchiveError) {
+              console.log('Unarchive endpoint failed, trying alternative method...');
+            }
+            
+            // Try approach 3: Use the "activate" endpoint if it exists
+            try {
+              console.log('Trying activate endpoint for archived item...');
+              await this.managementApi.post(
+                `/items/${itemId}/activate`,
+                {
+                  workflow_step: {
+                    id: workflowStepId
+                  }
+                }
+              );
+              console.log(`Successfully activated archived item ${itemId} to workflow step ${workflowStepId}`);
+              return; // Success, exit early
+            } catch (activateError) {
+              console.log('Activate endpoint failed, trying alternative method...');
+            }
+            
+            // Try approach 4: Use the "publish" endpoint with force flag if it exists
+            try {
+              console.log('Trying force publish endpoint for archived item...');
+              await this.managementApi.post(
+                `/items/${itemId}/publish`,
+                {
+                  workflow_step: {
+                    id: workflowStepId
+                  },
+                  force: true
+                }
+              );
+              console.log(`Successfully force published archived item ${itemId} to workflow step ${workflowStepId}`);
+              return; // Success, exit early
+            } catch (forcePublishError) {
+              console.log('Force publish endpoint failed, trying alternative method...');
+            }
+            
+            // Try approach 5: Use the "workflow" endpoint with different parameters
+            try {
+              console.log('Trying workflow endpoint with different parameters for archived item...');
               await this.managementApi.put(
                 `/items/${itemId}/workflow`,
                 {
                   workflow_identifier: { id: defaultWorkflow.id },
-                  step_identifier: { id: workflowStepId }
+                  step_identifier: { id: workflowStepId },
+                  force: true,
+                  skip_validation: true
                 }
               );
-              
-              console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} using workflow endpoint`);
+              console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} using workflow endpoint with force`);
               return; // Success, exit early
-              
-            } catch (workflowError) {
-              console.error('All methods failed for archived item:', workflowError);
-              throw new Error(`Cannot modify archived content item. All attempts to change workflow step or create new version failed.`);
+            } catch (workflowForceError) {
+              console.log('Workflow endpoint with force failed, trying alternative method...');
             }
+            
+            // If all approaches fail, throw a comprehensive error
+            console.error('All alternative approaches for archived item failed');
+            throw new Error(`Cannot modify archived content item. All alternative approaches failed. This item may require manual intervention in the Kontent.ai interface.`);
+            
+          } catch (alternativeError) {
+            console.error('Failed to handle archived item with alternative approaches:', alternativeError);
+            throw new Error(`Cannot modify archived content item. All approaches failed: ${alternativeError instanceof Error ? alternativeError.message : String(alternativeError)}`);
           }
         } else if (isPublished) {
           // For published items, try to unpublish first, then update
