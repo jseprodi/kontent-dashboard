@@ -108,7 +108,12 @@ export class ApiService {
       console.log('Making request to content items API...');
       console.log('Management API base URL:', this.managementApi.defaults.baseURL);
       
-      const response = await this.managementApi.get<ManagementApiResponse<ContentItem[]>>('/items');
+      // Include query parameters to fetch contributors and workflow information
+      const response = await this.managementApi.get<ManagementApiResponse<ContentItem[]>>('/items', {
+        params: {
+          elements: 'title,name,codename,type,last_modified,language,workflow_step,contributors'
+        }
+      });
       
       console.log('Content items API response:', response);
       console.log('Response status:', response.status);
@@ -133,15 +138,19 @@ export class ApiService {
       
       console.log('Processed items:', items);
       
-      const mappedItems = items.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        codename: item.codename,
-        type: item.type,
-        lastModified: item.lastModified,
-        language: item.language,
-        contributors: item.contributors,
-      }));
+      const mappedItems = items.map((item: any) => {
+        console.log('Raw item data:', item);
+        return {
+          id: item.id,
+          name: item.name || item.title,
+          codename: item.codename,
+          type: item.type,
+          lastModified: item.lastModified || item.last_modified,
+          language: item.language,
+          contributors: item.contributors || item.assigned_users || [],
+          workflow_step: item.workflow_step || item.workflow_step_id
+        };
+      });
       
       console.log('Mapped content items:', mappedItems);
       
