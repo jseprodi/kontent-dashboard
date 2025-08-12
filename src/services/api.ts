@@ -972,10 +972,9 @@ export class ApiService {
                  try {
                    // Use the official workflow step change endpoint for archived items
                    await this.managementApi.put(
-                     `/items/${itemId}/variants/${languageIdentifier}/workflow`,
+                     `/items/${itemId}/variants/${languageIdentifier}/workflow_step`,
                      {
-                       workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                       step_identifier: { id: workflowStepId }
+                       id: workflowStepId
                      }
                    );
                    console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
@@ -1126,10 +1125,9 @@ export class ApiService {
                    try {
                      // Use the official workflow step change endpoint for archived items
                      await this.managementApi.put(
-                       `/items/${itemId}/variants/${language.id}/workflow`,
+                       `/items/${itemId}/variants/${language.id}/workflow_step`,
                        {
-                         workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
-                         step_identifier: { id: workflowStepId }
+                         id: workflowStepId
                        }
                      );
                      console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} with resolved language ID: ${language.id}`);
