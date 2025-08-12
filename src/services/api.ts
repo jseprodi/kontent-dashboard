@@ -906,7 +906,7 @@ export class ApiService {
             // Use the official workflow step change endpoint for archived items
             // Note: This endpoint should be at the subscription level, not project level
             await this.subscriptionApi.put(
-              `/items/${itemId}/variants/${languageIdentifier}/workflow`,
+              `/variants/${languageIdentifier}/workflow`,
               {
                 workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
                 step_identifier: { id: workflowStepId }
@@ -1057,7 +1057,7 @@ export class ApiService {
                 // Use the official workflow step change endpoint for archived items
                 // Note: This endpoint should be at the subscription level, not project level
                 await this.subscriptionApi.put(
-                  `/items/${itemId}/variants/${language.id}/workflow`,
+                  `/variants/${language.id}/workflow`,
                   {
                     workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
                     step_identifier: { id: workflowStepId }
