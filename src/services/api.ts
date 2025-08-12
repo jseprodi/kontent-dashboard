@@ -890,8 +890,12 @@ export class ApiService {
       // For draft items, we can update the variant directly
       
       try {
-        // First, get the current variant to see its current state
-        const currentVariant = await this.getContentItem(itemId, languageIdentifier);
+        // First, resolve the language identifier to get the actual language ID
+        const actualLanguageId = await this.resolveLanguageToId(languageIdentifier);
+        console.log(`Resolved language identifier '${languageIdentifier}' to ID: ${actualLanguageId}`);
+        
+        // Get the current variant to see its current state
+        const currentVariant = await this.getContentItem(itemId, actualLanguageId);
         console.log('Current variant before workflow change:', currentVariant);
         
         // Check if the item is published or archived
@@ -916,20 +920,15 @@ export class ApiService {
             console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change`);
             console.log('Full default workflow object:', JSON.stringify(defaultWorkflow, null, 2));
             
-                    // Use the official workflow step change endpoint for archived items
-        // This endpoint is at the project level, not subscription level
-        // Use the original language identifier (codename) instead of resolved ID for the URL path
-        const urlLanguageIdentifier = typeof languageIdentifier === 'string' && languageIdentifier !== '00000000-0000-0000-0000-000000000000' 
-          ? languageIdentifier 
-          : 'default'; // Fallback to 'default' if we have the placeholder ID
-        
-        await this.managementApi.put(
-          `/items/${itemId}/variants/${urlLanguageIdentifier}/workflow`,
-          {
-            workflow_identifier: { codename: defaultWorkflow.codename },
-            step_identifier: { id: workflowStepId }
-          }
-        );
+            // Use the official workflow step change endpoint for archived items
+            // This endpoint is at the project level, not subscription level
+            await this.managementApi.put(
+              `/items/${itemId}/variants/${actualLanguageId}/workflow`,
+              {
+                workflow_identifier: { codename: defaultWorkflow.codename },
+                step_identifier: { id: workflowStepId }
+              }
+            );
             console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
             return; // Success, exit early
             
@@ -961,7 +960,7 @@ export class ApiService {
               console.log('New version data for fallback method:', newVersionData);
               
               // Use the existing upsertLanguageVariant method to create the new version
-              await this.upsertLanguageVariant(itemId, languageIdentifier, newVersionData, currentVariant.language);
+              await this.upsertLanguageVariant(itemId, actualLanguageId, newVersionData, currentVariant.language);
               console.log(`Successfully created new version with workflow step ${workflowStepId} for archived item ${itemId} (fallback method)`);
               
             } catch (fallbackError) {
@@ -1008,7 +1007,7 @@ export class ApiService {
             delete updatedVariantData.last_modified;
             delete updatedVariantData.version;
             
-            await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
+            await this.upsertLanguageVariant(itemId, actualLanguageId, updatedVariantData, currentVariant.language);
             console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} after unpublishing`);
             
           } catch (unpublishError) {
@@ -1051,214 +1050,13 @@ export class ApiService {
           console.log('Updated variant data for workflow change:', updatedVariantData);
           
           // Update the variant with the new workflow step
-          await this.upsertLanguageVariant(itemId, languageIdentifier, updatedVariantData, currentVariant.language);
+          await this.upsertLanguageVariant(itemId, actualLanguageId, updatedVariantData, currentVariant.language);
           console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId}`);
         }
         
-      } catch (error) {
-        console.log(`Failed to change workflow step with identifier '${languageIdentifier}', trying to resolve language...`);
-        console.log('Original error:', error);
-        
-        // If the identifier fails, try to resolve it
-        try {
-          const languages = await this.getLanguages();
-          
-          // Check if the identifier is already a language ID
-          let language = languages.find(lang => lang.id === languageIdentifier);
-          
-          // If not found by ID, try to find by codename
-          if (!language) {
-            language = languages.find(lang => lang.codename === languageIdentifier);
-          }
-          
-          // If still not found, try common default language names
-          if (!language) {
-            language = languages.find(lang => 
-              lang.codename === 'default' || 
-              lang.codename === 'en-us' || 
-              lang.codename === 'en'
-            );
-          }
-          
-          // If still not found, use the first available language
-          if (!language && languages.length > 0) {
-            language = languages[0];
-          }
-          
-          if (language) {
-            console.log(`Found language: ${language.codename} -> ${language.id}`);
-            
-            // Get the current variant with the resolved language ID
-            const currentVariant = await this.getContentItem(itemId, language.id);
-            console.log('Current variant before workflow change (resolved language):', currentVariant);
-            
-            // Check workflow state again with resolved language
-            const currentWorkflowStep = currentVariant.workflow_step;
-            const isPublished = currentWorkflowStep?.id === 'c199950d-99f0-4983-b711-6c4c91624b22';
-            const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391';
-            
-            if (isArchived) {
-              // For archived items, try the workflow change endpoint FIRST
-              console.log('Item is archived with resolved language, trying workflow change endpoint first...');
-              
-              // Get the default workflow to use its ID for the workflow_identifier
-              let defaultWorkflow: any;
-              try {
-                const workflows = await this.getWorkflows();
-                defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-                
-                if (!defaultWorkflow) {
-                  throw new Error('No default workflow found for workflow change');
-                }
-                
-                console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change (resolved language)`);
-            console.log('Full default workflow object (resolved language):', JSON.stringify(defaultWorkflow, null, 2));
-                
-                // Use the official workflow step change endpoint for archived items
-                // This endpoint is at the project level, not subscription level
-                // Use the language codename instead of ID for the URL path
-                const urlLanguageIdentifier = language.codename || 'default';
-                
-                await this.managementApi.put(
-                  `/items/${itemId}/variants/${urlLanguageIdentifier}/workflow`,
-                  {
-                    workflow_identifier: { codename: defaultWorkflow.codename },
-                    step_identifier: { id: workflowStepId }
-                  }
-                );
-                console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} with resolved language ID: ${language.id}`);
-                return; // Success, exit early
-                
-              } catch (workflowChangeError) {
-                console.error('Failed to change workflow step for archived item (resolved language):', workflowChangeError);
-                console.log('Falling back to alternative method for archived item (resolved language)...');
-                
-                // Fallback: try to create a new version
-                try {
-                  console.log('Creating new version for archived item using fallback method (resolved language)...');
-                  
-                  // Create new version data with updated workflow step
-                  const newVersionData = {
-                    ...currentVariant,
-                    workflow_step: {
-                      id: workflowStepId
-                    },
-                    workflow: {
-                      workflow_identifier: { codename: defaultWorkflow.codename },
-                      step_identifier: { id: workflowStepId }
-                    }
-                  };
-                  
-                  // Remove fields that shouldn't be copied to new version
-                  delete newVersionData.id;
-                  delete newVersionData.last_modified;
-                  delete newVersionData.version;
-                  
-                  console.log('New version data for fallback method (resolved language):', newVersionData);
-                  
-                  // Use the existing upsertLanguageVariant method to create the new version
-                  await this.upsertLanguageVariant(itemId, language.id, newVersionData, currentVariant.language);
-                  console.log(`Successfully created new version with workflow step ${workflowStepId} for archived item ${itemId} with resolved language ID: ${language.id} (fallback method)`);
-                  
-                } catch (fallbackError) {
-                  console.error('Failed to create new version using fallback method (resolved language):', fallbackError);
-                  const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-                  throw new Error(`Cannot modify archived content item. Failed to change workflow step: ${errorMessage}`);
-                }
-              }
-            } else if (isPublished) {
-              // For published items, try to unpublish first, then update
-              console.log('Item is published with resolved language, trying to unpublish first...');
-              
-              // Get the default workflow to use its ID for the workflow_identifier
-              let defaultWorkflow: any;
-              try {
-                const workflows = await this.getWorkflows();
-                defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-                
-                if (!defaultWorkflow) {
-                  throw new Error('No default workflow found for workflow change');
-                }
-                
-                console.log(`Using workflow codename: ${defaultWorkflow.codename} for published item workflow change (resolved language)`);
-                
-                // Use the language codename instead of ID for the URL path
-                const urlLanguageIdentifier = language.codename || 'default';
-                
-                await this.managementApi.put(
-                  `/items/${itemId}/variants/${urlLanguageIdentifier}/unpublish`
-                );
-                console.log(`Successfully unpublished item ${itemId} with resolved language ID: ${language.id}`);
-                
-                // Now try to update the workflow step
-                const updatedVariantData = {
-                  ...currentVariant,
-                  workflow_step: {
-                    id: workflowStepId
-                  },
-                  workflow: {
-                    workflow_identifier: { codename: defaultWorkflow.codename },
-                    step_identifier: { id: workflowStepId }
-                  }
-                };
-                
-                delete updatedVariantData.id;
-                delete updatedVariantData.last_modified;
-                delete updatedVariantData.version;
-                
-                await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
-                console.log(`Successfully updated workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id} after unpublishing`);
-                
-              } catch (unpublishError) {
-                console.error('Failed to unpublish item (resolved language):', unpublishError);
-                const errorMessage = unpublishError instanceof Error ? unpublishError.message : String(unpublishError);
-                throw new Error(`Cannot modify published content item. Failed to unpublish: ${errorMessage}`);
-              }
-
-            } else {
-              // For draft items, update variant directly
-              
-              // Get the default workflow to use its ID for the workflow_identifier
-              let defaultWorkflow: any;
-              try {
-                const workflows = await this.getWorkflows();
-                defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
-                
-                if (!defaultWorkflow) {
-                  throw new Error('No default workflow found for workflow change');
-                }
-                
-                console.log(`Using workflow codename: ${defaultWorkflow.codename} for draft item workflow change (resolved language)`);
-              } catch (workflowError) {
-                console.warn('Could not get default workflow, using fallback:', workflowError);
-                defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
-              }
-              
-              const updatedVariantData = {
-                ...currentVariant,
-                workflow_step: {
-                  id: workflowStepId
-                },
-                workflow: {
-                  workflow_identifier: { codename: defaultWorkflow.codename },
-                  step_identifier: { id: workflowStepId }
-                }
-              };
-              
-              console.log('Updated variant data for workflow change (resolved language):', updatedVariantData);
-              
-              await this.upsertLanguageVariant(itemId, language.id, updatedVariantData, currentVariant.language);
-              console.log(`Successfully changed workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
-            }
-          } else {
-            console.log(`No suitable language found for identifier: ${languageIdentifier}`);
-            throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
-          }
-        } catch (languageError) {
-          console.error('Error resolving language identifier:', languageError);
-          console.error('Language error details:', languageError);
-          throw error; // Re-throw the original error
-        }
+            } catch (error) {
+        console.error('Error in workflow step change:', error);
+        throw error; // Re-throw the error for proper handling
       }
     } catch (error) {
       console.error('Error changing workflow step:', error);
@@ -1276,6 +1074,46 @@ export class ApiService {
   }
 
 
+
+  /**
+   * Resolve a language identifier (codename or ID) to a language ID
+   */
+  async resolveLanguageToId(languageIdentifier: string): Promise<string> {
+    try {
+      const languages = await this.getLanguages();
+      
+      // Check if the identifier is already a language ID
+      let language = languages.find(lang => lang.id === languageIdentifier);
+      
+      // If not found by ID, try to find by codename
+      if (!language) {
+        language = languages.find(lang => lang.codename === languageIdentifier);
+      }
+      
+      // If still not found, try common default language names
+      if (!language) {
+        language = languages.find(lang => 
+          lang.codename === 'default' || 
+          lang.codename === 'en-us' || 
+          lang.codename === 'en'
+        );
+      }
+      
+      // If still not found, use the first available language
+      if (!language && languages.length > 0) {
+        language = languages[0];
+      }
+      
+      if (!language) {
+        throw new Error(`No suitable language found for identifier: ${languageIdentifier}`);
+      }
+      
+      return language.id;
+    } catch (error) {
+      console.error('Error resolving language identifier:', error);
+      throw new Error(`Failed to resolve language identifier: ${languageIdentifier}`);
+    }
+  }
 
   /**
    * Resolve email addresses to Kontent.ai user IDs
