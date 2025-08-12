@@ -902,13 +902,25 @@ export class ApiService {
         if (isArchived) {
           // For archived items, try the workflow change endpoint FIRST
           console.log('Item is archived, trying workflow change endpoint first...');
+          
+          // Get the default workflow to use its ID for the workflow_identifier
+          let defaultWorkflow: any;
           try {
+            const workflows = await this.getWorkflows();
+            defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+            
+            if (!defaultWorkflow) {
+              throw new Error('No default workflow found for workflow change');
+            }
+            
+            console.log(`Using workflow ID: ${defaultWorkflow.id} for workflow change`);
+            
             // Use the official workflow step change endpoint for archived items
             // This endpoint is at the project level, not subscription level
             await this.managementApi.put(
               `/items/${itemId}/variants/${languageIdentifier}/workflow`,
               {
-                workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                workflow_identifier: { id: defaultWorkflow.id },
                 step_identifier: { id: workflowStepId }
               }
             );
@@ -930,7 +942,7 @@ export class ApiService {
                   id: workflowStepId
                 },
                 workflow: {
-                  workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                  workflow_identifier: { id: defaultWorkflow.id },
                   step_identifier: { id: workflowStepId }
                 }
               };
@@ -955,7 +967,19 @@ export class ApiService {
         } else if (isPublished) {
           // For published items, try to unpublish first, then update
           console.log('Item is published, trying to unpublish first...');
+          
+          // Get the default workflow to use its ID for the workflow_identifier
+          let defaultWorkflow: any;
           try {
+            const workflows = await this.getWorkflows();
+            defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+            
+            if (!defaultWorkflow) {
+              throw new Error('No default workflow found for workflow change');
+            }
+            
+            console.log(`Using workflow ID: ${defaultWorkflow.id} for published item workflow change`);
+            
             await this.managementApi.put(
               `/items/${itemId}/variants/${languageIdentifier}/unpublish`
             );
@@ -968,7 +992,7 @@ export class ApiService {
                 id: workflowStepId
               },
               workflow: {
-                workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                workflow_identifier: { id: defaultWorkflow.id },
                 step_identifier: { id: workflowStepId }
               }
             };
@@ -989,6 +1013,22 @@ export class ApiService {
           // For draft items, we can update the variant directly
           console.log('Item is in draft state, updating variant directly...');
           
+          // Get the default workflow to use its ID for the workflow_identifier
+          let defaultWorkflow: any;
+          try {
+            const workflows = await this.getWorkflows();
+            defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+            
+            if (!defaultWorkflow) {
+              throw new Error('No default workflow found for workflow change');
+            }
+            
+            console.log(`Using workflow ID: ${defaultWorkflow.id} for draft item workflow change`);
+          } catch (workflowError) {
+            console.warn('Could not get default workflow, using fallback:', workflowError);
+            defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
+          }
+          
           // Create updated variant data with the new workflow step
           const updatedVariantData = {
             ...currentVariant,
@@ -996,7 +1036,7 @@ export class ApiService {
               id: workflowStepId
             },
             workflow: {
-              workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+              workflow_identifier: { id: defaultWorkflow.id },
               step_identifier: { id: workflowStepId }
             }
           };
@@ -1053,13 +1093,25 @@ export class ApiService {
             if (isArchived) {
               // For archived items, try the workflow change endpoint FIRST
               console.log('Item is archived with resolved language, trying workflow change endpoint first...');
+              
+              // Get the default workflow to use its ID for the workflow_identifier
+              let defaultWorkflow: any;
               try {
+                const workflows = await this.getWorkflows();
+                defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+                
+                if (!defaultWorkflow) {
+                  throw new Error('No default workflow found for workflow change');
+                }
+                
+                console.log(`Using workflow ID: ${defaultWorkflow.id} for workflow change (resolved language)`);
+                
                 // Use the official workflow step change endpoint for archived items
                 // This endpoint is at the project level, not subscription level
                 await this.managementApi.put(
                   `/items/${itemId}/variants/${language.id}/workflow`,
                   {
-                    workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                    workflow_identifier: { id: defaultWorkflow.id },
                     step_identifier: { id: workflowStepId }
                   }
                 );
@@ -1081,7 +1133,7 @@ export class ApiService {
                       id: workflowStepId
                     },
                     workflow: {
-                      workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                      workflow_identifier: { id: defaultWorkflow.id },
                       step_identifier: { id: workflowStepId }
                     }
                   };
@@ -1106,7 +1158,19 @@ export class ApiService {
             } else if (isPublished) {
               // For published items, try to unpublish first, then update
               console.log('Item is published with resolved language, trying to unpublish first...');
+              
+              // Get the default workflow to use its ID for the workflow_identifier
+              let defaultWorkflow: any;
               try {
+                const workflows = await this.getWorkflows();
+                defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+                
+                if (!defaultWorkflow) {
+                  throw new Error('No default workflow found for workflow change');
+                }
+                
+                console.log(`Using workflow ID: ${defaultWorkflow.id} for published item workflow change (resolved language)`);
+                
                 await this.managementApi.put(
                   `/items/${itemId}/variants/${language.id}/unpublish`
                 );
@@ -1119,7 +1183,7 @@ export class ApiService {
                     id: workflowStepId
                   },
                   workflow: {
-                    workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                    workflow_identifier: { id: defaultWorkflow.id },
                     step_identifier: { id: workflowStepId }
                   }
                 };
@@ -1139,13 +1203,30 @@ export class ApiService {
 
             } else {
               // For draft items, update variant directly
+              
+              // Get the default workflow to use its ID for the workflow_identifier
+              let defaultWorkflow: any;
+              try {
+                const workflows = await this.getWorkflows();
+                defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+                
+                if (!defaultWorkflow) {
+                  throw new Error('No default workflow found for workflow change');
+                }
+                
+                console.log(`Using workflow ID: ${defaultWorkflow.id} for draft item workflow change (resolved language)`);
+              } catch (workflowError) {
+                console.warn('Could not get default workflow, using fallback:', workflowError);
+                defaultWorkflow = { id: '00000000-0000-0000-0000-000000000000' };
+              }
+              
               const updatedVariantData = {
                 ...currentVariant,
                 workflow_step: {
                   id: workflowStepId
                 },
                 workflow: {
-                  workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                  workflow_identifier: { id: defaultWorkflow.id },
                   step_identifier: { id: workflowStepId }
                 }
               };
