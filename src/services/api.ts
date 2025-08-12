@@ -904,134 +904,89 @@ export class ApiService {
         const isArchived = currentWorkflowStep?.id === '7a535a69-ad34-47f8-806a-def1fdf4d391'; // Archived step ID
         
         if (isArchived) {
-          // For archived items, try the workflow change endpoint FIRST
-          console.log('Item is archived, trying workflow change endpoint first...');
+          // For archived items, we need to create a new version since we can't modify archived variants
+          console.log('Item is archived, attempting to create new version with updated workflow step...');
           
-          // Get the default workflow to use its ID for the workflow_identifier
-          let defaultWorkflow: any;
           try {
+            // Get the default workflow to understand the target step
             const workflows = await this.getWorkflows();
-            defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+            const defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
             
             if (!defaultWorkflow) {
-              throw new Error('No default workflow found for workflow change');
+              throw new Error('No default workflow found for creating new version');
             }
             
-            console.log(`Using workflow codename: ${defaultWorkflow.codename} for workflow change`);
-            console.log('Full default workflow object:', JSON.stringify(defaultWorkflow, null, 2));
+            console.log(`Creating new version for archived item ${itemId} with workflow step ${workflowStepId}`);
             
-                         // Use the official workflow step change endpoint for archived items
-            // According to the API documentation, this should be at the item level
-            console.log(`Attempting workflow change with workflow_identifier: ${JSON.stringify({ codename: defaultWorkflow.codename })}`);
-            console.log(`And step_identifier: ${JSON.stringify({ id: workflowStepId })}`);
-            
-            // Try to get step information to see if we have a codename
-            let stepInfo: any = null;
-            if (defaultWorkflow.steps && Array.isArray(defaultWorkflow.steps)) {
-              stepInfo = defaultWorkflow.steps.find((step: any) => step.id === workflowStepId);
-              if (stepInfo) {
-                console.log(`Found step info: ${JSON.stringify(stepInfo, null, 2)}`);
+            // Create new version data with updated workflow step
+            const newVersionData = {
+              ...currentVariant,
+              workflow_step: {
+                id: workflowStepId
+              },
+              workflow: {
+                workflow_identifier: { id: defaultWorkflow.id },
+                step_identifier: { id: workflowStepId }
               }
-            }
+            };
             
-            // Try with workflow codename first
+            // Remove fields that shouldn't be copied to new version
+            delete newVersionData.id;
+            delete newVersionData.last_modified;
+            delete newVersionData.version;
+            delete newVersionData.created;
+            delete newVersionData.modified;
+            
+            console.log('New version data for archived item:', JSON.stringify(newVersionData, null, 2));
+            
+            // Try to create the new version using the variant creation endpoint
+            // This should create a new version in the target workflow step
+            await this.managementApi.post(
+              `/items/${itemId}/variants`,
+              {
+                elements: newVersionData.elements,
+                workflow_step: {
+                  id: workflowStepId
+                },
+                workflow: {
+                  workflow_identifier: { id: defaultWorkflow.id },
+                  step_identifier: { id: workflowStepId }
+                }
+              }
+            );
+            
+            console.log(`Successfully created new version with workflow step ${workflowStepId} for archived item ${itemId}`);
+            return; // Success, exit early
+            
+          } catch (createVersionError) {
+            console.error('Failed to create new version for archived item:', createVersionError);
+            
+            // If creating a new version fails, try the workflow change endpoint as a last resort
+            console.log('Attempting workflow change endpoint as last resort...');
+            
             try {
+              const workflows = await this.getWorkflows();
+              const defaultWorkflow = workflows.find(w => w.codename === 'default') || workflows[0];
+              
+              if (!defaultWorkflow) {
+                throw new Error('No default workflow found for workflow change');
+              }
+              
+              // Try the item-level workflow endpoint
               await this.managementApi.put(
                 `/items/${itemId}/workflow`,
                 {
-                  workflow_identifier: { codename: defaultWorkflow.codename },
+                  workflow_identifier: { id: defaultWorkflow.id },
                   step_identifier: { id: workflowStepId }
                 }
               );
-              console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
+              
+              console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} using workflow endpoint`);
               return; // Success, exit early
-            } catch (codenameError) {
-              console.log('Failed with workflow codename, trying with workflow ID...');
               
-              // Try with workflow ID instead
-              try {
-                await this.managementApi.put(
-                  `/items/${itemId}/workflow`,
-                  {
-                    workflow_identifier: { id: defaultWorkflow.id },
-                    step_identifier: { id: workflowStepId }
-                  }
-                );
-                console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} using workflow ID`);
-                return; // Success, exit early
-              } catch (idError) {
-                console.log('Failed with workflow ID, trying with step codename...');
-                
-                // Try with step codename if available
-                if (stepInfo && stepInfo.codename) {
-                  try {
-                    await this.managementApi.put(
-                      `/items/${itemId}/workflow`,
-                      {
-                        workflow_identifier: { id: defaultWorkflow.id },
-                        step_identifier: { codename: stepInfo.codename }
-                      }
-                    );
-                    console.log(`Successfully changed workflow step to ${stepInfo.codename} for archived item ${itemId} using step codename`);
-                    return; // Success, exit early
-                  } catch (codenameStepError) {
-                    console.log('Failed with step codename, trying variant-level endpoint...');
-                  }
-                }
-                
-                // Try the variant-level endpoint as a last resort
-                try {
-                  await this.managementApi.put(
-                    `/items/${itemId}/variants/${actualLanguageId}/workflow`,
-                    {
-                      workflow_identifier: { id: defaultWorkflow.id },
-                      step_identifier: { id: workflowStepId }
-                    }
-                  );
-                  console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} using variant-level endpoint`);
-                  return; // Success, exit early
-                } catch (variantError) {
-                  console.log('All workflow change methods failed, throwing error...');
-                  throw variantError;
-                }
-              }
-            }
-            
-          } catch (workflowChangeError) {
-            console.error('Failed to change workflow step for archived item:', workflowChangeError);
-            console.log('Falling back to alternative method for archived item...');
-            
-            // Fallback: try to create a new version
-            try {
-              console.log('Creating new version for archived item using fallback method...');
-              
-                             // Create new version data with updated workflow step
-               const newVersionData = {
-                 ...currentVariant,
-                 workflow_step: {
-                   id: workflowStepId
-                 },
-                 workflow: {
-                   workflow_identifier: { codename: defaultWorkflow.codename },
-                   step_identifier: { id: workflowStepId }
-                 }
-               };
-              
-              // Remove fields that shouldn't be copied to new version
-              delete newVersionData.id;
-              delete newVersionData.last_modified;
-              delete newVersionData.version;
-              
-              console.log('New version data for fallback method:', newVersionData);
-              
-              // Use the existing upsertLanguageVariant method to create the new version
-              await this.upsertLanguageVariant(itemId, actualLanguageId, newVersionData, currentVariant.language);
-              console.log(`Successfully created new version with workflow step ${workflowStepId} for archived item ${itemId} (fallback method)`);
-              
-            } catch (fallbackError) {
-              console.error('Failed to create new version using fallback method:', fallbackError);
-              const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-              throw new Error(`Cannot modify archived content item. Failed to change workflow step: ${errorMessage}`);
+            } catch (workflowError) {
+              console.error('All methods failed for archived item:', workflowError);
+              throw new Error(`Cannot modify archived content item. All attempts to change workflow step or create new version failed.`);
             }
           }
         } else if (isPublished) {
