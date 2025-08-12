@@ -970,9 +970,13 @@ export class ApiService {
                  // For archived items, we need to use the workflow step change endpoint
                  console.log('Trying to change workflow step for archived item...');
                  try {
-                   // Use the proper workflow step change endpoint for archived items
-                   await this.managementApi.post(
-                     `/items/${itemId}/variants/${languageIdentifier}/workflow/${workflowStepId}`
+                   // Use the official workflow step change endpoint for archived items
+                   await this.managementApi.put(
+                     `/items/${itemId}/variants/${languageIdentifier}/workflow`,
+                     {
+                       workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
+                       step_identifier: { id: workflowStepId }
+                     }
                    );
                    console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId}`);
                    
@@ -1120,25 +1124,15 @@ export class ApiService {
                    // For archived items, try to unarchive first
                    console.log('Trying to unarchive item first (resolved language)...');
                    try {
-                     // Try to change the workflow step directly to unarchive it
-                     const unarchiveVariantData = {
-                       ...currentVariant,
-                       workflow_step: {
-                         id: workflowStepId
-                       },
-                       workflow: {
+                     // Use the official workflow step change endpoint for archived items
+                     await this.managementApi.put(
+                       `/items/${itemId}/variants/${language.id}/workflow`,
+                       {
                          workflow_identifier: currentVariant.workflow?.workflow_identifier || { id: '00000000-0000-0000-0000-000000000000' },
                          step_identifier: { id: workflowStepId }
                        }
-                     };
-                     
-                     delete unarchiveVariantData.id;
-                     delete unarchiveVariantData.last_modified;
-                     delete unarchiveVariantData.version;
-                     
-                     // Try to update the archived variant directly
-                     await this.upsertLanguageVariant(itemId, language.id, unarchiveVariantData, currentVariant.language);
-                     console.log(`Successfully unarchived and updated workflow step to ${workflowStepId} for item ${itemId} with resolved language ID: ${language.id}`);
+                     );
+                     console.log(`Successfully changed workflow step to ${workflowStepId} for archived item ${itemId} with resolved language ID: ${language.id}`);
                      
                    } catch (unarchiveError) {
                      console.error('Failed to unarchive item (resolved language):', unarchiveError);
