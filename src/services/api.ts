@@ -108,12 +108,8 @@ export class ApiService {
       console.log('Making request to content items API...');
       console.log('Management API base URL:', this.managementApi.defaults.baseURL);
       
-      // Include query parameters to fetch contributors and workflow information
-      const response = await this.managementApi.get<ManagementApiResponse<ContentItem[]>>('/items', {
-        params: {
-          elements: 'title,name,codename,type,last_modified,language,workflow_step,contributors'
-        }
-      });
+      // First, get the basic content items
+      const response = await this.managementApi.get<ManagementApiResponse<ContentItem[]>>('/items');
       
       console.log('Content items API response:', response);
       console.log('Response status:', response.status);
@@ -138,23 +134,61 @@ export class ApiService {
       
       console.log('Processed items:', items);
       
-      const mappedItems = items.map((item: any) => {
-        console.log('Raw item data:', item);
-        return {
-          id: item.id,
-          name: item.name || item.title,
-          codename: item.codename,
-          type: item.type,
-          lastModified: item.lastModified || item.last_modified,
-          language: item.language,
-          contributors: item.contributors || item.assigned_users || [],
-          workflow_step: item.workflow_step || item.workflow_step_id
-        };
-      });
+      // Now fetch language variants for each item to get contributor assignments
+      const itemsWithContributors = await Promise.all(
+        items.map(async (item: any) => {
+          try {
+            // Get language variants for this item
+            const variants = await this.getContentItemVariants(item.id);
+            console.log(`Variants for item ${item.id}:`, variants);
+            
+            // Extract contributors from variants
+            let contributors: string[] = [];
+            let workflow_step = null;
+            
+            if (variants && variants.length > 0) {
+              // Use the first variant (usually the default language)
+              const variant = variants[0];
+              if (variant.contributors && Array.isArray(variant.contributors)) {
+                contributors = variant.contributors.map((c: any) => 
+                  typeof c === 'string' ? c : c.id
+                );
+              }
+              workflow_step = variant.workflow_step;
+            }
+            
+            console.log(`Item ${item.id} contributors:`, contributors);
+            
+            return {
+              id: item.id,
+              name: item.name || item.title,
+              codename: item.codename,
+              type: item.type,
+              lastModified: item.lastModified || item.last_modified,
+              language: item.language,
+              contributors: contributors,
+              workflow_step: workflow_step
+            };
+          } catch (error) {
+            console.error(`Error fetching variants for item ${item.id}:`, error);
+            // Return item without contributor data if there's an error
+            return {
+              id: item.id,
+              name: item.name || item.title,
+              codename: item.codename,
+              type: item.type,
+              lastModified: item.lastModified || item.last_modified,
+              language: item.language,
+              contributors: [],
+              workflow_step: null
+            };
+          }
+        })
+      );
       
-      console.log('Mapped content items:', mappedItems);
+      console.log('Mapped content items with contributors:', itemsWithContributors);
       
-      return mappedItems;
+      return itemsWithContributors;
     } catch (error: any) {
       console.error('Error fetching content items - Full error:', error);
       
