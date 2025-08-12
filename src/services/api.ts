@@ -914,6 +914,7 @@ export class ApiService {
             }
             
             console.log(`Using workflow ID: ${defaultWorkflow.id} for workflow change`);
+            console.log('Full default workflow object:', JSON.stringify(defaultWorkflow, null, 2));
             
             // Use the official workflow step change endpoint for archived items
             // This endpoint is at the project level, not subscription level
@@ -979,6 +980,7 @@ export class ApiService {
             }
             
             console.log(`Using workflow ID: ${defaultWorkflow.id} for published item workflow change`);
+            console.log('Full default workflow object (published):', JSON.stringify(defaultWorkflow, null, 2));
             
             await this.managementApi.put(
               `/items/${itemId}/variants/${languageIdentifier}/unpublish`
@@ -1105,6 +1107,7 @@ export class ApiService {
                 }
                 
                 console.log(`Using workflow ID: ${defaultWorkflow.id} for workflow change (resolved language)`);
+            console.log('Full default workflow object (resolved language):', JSON.stringify(defaultWorkflow, null, 2));
                 
                 // Use the official workflow step change endpoint for archived items
                 // This endpoint is at the project level, not subscription level
