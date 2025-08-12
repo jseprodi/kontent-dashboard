@@ -263,8 +263,7 @@ export function ContributorDashboard({ apiService }: ContributorDashboardProps) 
               <div key={assignment.contributor.id} className="assignment-card">
                 <div className="assignment-header">
                   <div className="contributor-info">
-                    <h3>{assignment.contributor.fullName || `${assignment.contributor.firstName || ''} ${assignment.contributor.lastName || ''}`.trim() || 'Unknown'}</h3>
-                    <p className="contributor-email">{assignment.contributor.email}</p>
+                    <h3>{assignment.contributor.email}</h3>
                   </div>
                   <div className="assignment-status">
                     {assignment.totalItems === 0 ? (
