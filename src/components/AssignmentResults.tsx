@@ -82,7 +82,7 @@ export function AssignmentResults({
                 </div>
                 <div className="manual-intervention-content">
                   <div className="manual-intervention-title">
-                    Content Item ID: {result.contentItemId}
+                    Content Item: {result.contentItemCodename || result.contentItemId}
                   </div>
                   {result.reason === 'archived' && (
                     <div className="manual-intervention-reason">
@@ -116,7 +116,7 @@ export function AssignmentResults({
                 </div>
                 <div className="error-content">
                   <div className="error-title">
-                    Content Item ID: {result.contentItemId}
+                    Content Item: {result.contentItemCodename || result.contentItemId}
                   </div>
                   {result.error && (
                     <div className="error-message">{result.error}</div>
@@ -139,7 +139,7 @@ export function AssignmentResults({
                 </div>
                 <div className="success-content">
                   <div className="success-title">
-                    Content Item ID: {result.contentItemId}
+                    Content Item: {result.contentItemCodename || result.contentItemId}
                   </div>
                   <div className="success-message">
                     {result.message || 'Contributors assigned successfully'}

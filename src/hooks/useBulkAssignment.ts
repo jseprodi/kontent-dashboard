@@ -50,11 +50,22 @@ export function useBulkAssignment({ apiService }: UseBulkAssignmentProps): UseBu
 
       // Use the new workflow management method that automatically handles workflow step changes
       const results = await apiService.bulkAssignContributorsWithWorkflowManagement(assignments);
-      setAssignmentResults(results);
+      
+      // Enhance the results with content item codenames
+      const enhancedResults = results.map(result => {
+        const contentItem = selectedContentItems.find(item => item.id === result.contentItemId);
+        return {
+          ...result,
+          contentItemCodename: contentItem?.codename || 'Unknown'
+        };
+      });
+      
+      setAssignmentResults(enhancedResults);
     } catch (error) {
       console.error('Error during bulk assignment:', error);
       setAssignmentResults([{
         contentItemId: 'general',
+        contentItemCodename: 'General Error',
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       }]);

@@ -4,6 +4,7 @@ import {
   ContentItem,
   ContentType,
   AssignmentRequest,
+  AssignmentResult,
   SubscriptionApiResponse,
   ManagementApiResponse,
   Workflow,
@@ -726,8 +727,8 @@ export class ApiService {
   async bulkAssignContributors(
     assignments: AssignmentRequest[], 
     draftStepId?: string
-  ): Promise<any[]> {
-    const results = [];
+  ): Promise<AssignmentResult[]> {
+    const results: AssignmentResult[] = [];
     
     for (const assignment of assignments) {
       try {
@@ -739,18 +740,25 @@ export class ApiService {
         );
         
         if (result.requiresManualIntervention) {
-          results.push(result);
+          results.push({
+            contentItemId: assignment.contentItemId,
+            success: false,
+            requiresManualIntervention: result.requiresManualIntervention,
+            reason: result.reason,
+            message: result.message,
+            instructions: result.instructions,
+          });
         } else {
           results.push({
+            contentItemId: assignment.contentItemId,
             success: true,
-            itemId: assignment.contentItemId,
             message: 'Contributors assigned successfully',
           });
         }
       } catch (error) {
         results.push({
+          contentItemId: assignment.contentItemId,
           success: false,
-          itemId: assignment.contentItemId,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
@@ -1274,7 +1282,7 @@ export class ApiService {
    */
   async bulkAssignContributorsWithWorkflowManagement(
     assignments: AssignmentRequest[]
-  ): Promise<any[]> {
+  ): Promise<AssignmentResult[]> {
     try {
       console.log('Bulk assigning contributors with workflow management...');
       

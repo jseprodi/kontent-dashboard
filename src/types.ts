@@ -82,6 +82,7 @@ export interface AssignmentRequest {
 
 export interface AssignmentResult {
   contentItemId: string;
+  contentItemCodename?: string;
   success: boolean;
   error?: string;
   requiresManualIntervention?: boolean;
